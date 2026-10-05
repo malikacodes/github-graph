@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+
+<head lang="en">
+    <title>GitHub Graph Settings</title>
+    <meta charset="utf-8" />
+    <script src="https://sdpi-components.dev/releases/v4/sdpi-components.js"></script>
+</head>
+
+<body>
+    <!--
+        Both fields have "global" on them, so they save to the plugin's global
+        settings and every GitHub Graph dial shares the same token and timer.
+    -->
+    <sdpi-item label="GitHub Token">
+        <sdpi-password setting="token" global placeholder="Paste your token"></sdpi-password>
+    </sdpi-item>
+
+    <sdpi-item label="Refresh Every">
+        <sdpi-select setting="refreshMinutes" global default="30">
+            <option value="5">5 minutes</option>
+            <option value="15">15 minutes</option>
+            <option value="30">30 minutes</option>
+            <option value="60">1 hour</option>
+            <option value="180">3 hours</option>
+        </sdpi-select>
+    </sdpi-item>
+</body>
+
+</html>

@@ -1,0 +1,53 @@
+{
+	"Name": "GitHub Graph",
+	"Version": "0.1.0.0",
+	"Author": "Malika Pixels",
+	"Actions": [
+		{
+			"Name": "Contribution Graph",
+			"UUID": "com.malikacodes.github-graph.graph",
+			"Icon": "imgs/actions/graph/icon",
+			"Tooltip": "Shows your GitHub contribution graph. Press to refresh, turn to scroll back, tap to return to this week.",
+			"PropertyInspectorPath": "ui/settings.html",
+			"Controllers": [
+				"Encoder"
+			],
+			"Encoder": {
+				"layout": "layouts/graph.json",
+				"TriggerDescription": {
+					"Push": "Refresh",
+					"Rotate": "Scroll through weeks",
+					"Touch": "Back to this week"
+				}
+			},
+			"States": [
+				{
+					"Image": "imgs/actions/graph/icon"
+				}
+			]
+		}
+	],
+	"Category": "GitHub Graph",
+	"CategoryIcon": "imgs/plugin/category-icon",
+	"CodePath": "bin/plugin.js",
+	"Description": "Shows my GitHub contribution graph on a Stream Deck + dial.",
+	"Icon": "imgs/plugin/marketplace",
+	"SDKVersion": 3,
+	"Software": {
+		"MinimumVersion": "7.1"
+	},
+	"OS": [
+		{
+			"Platform": "mac",
+			"MinimumVersion": "12"
+		},
+		{
+			"Platform": "windows",
+			"MinimumVersion": "10"
+		}
+	],
+	"Nodejs": {
+		"Version": "24"
+	},
+	"UUID": "com.malikacodes.github-graph"
+}

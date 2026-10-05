@@ -1,0 +1,16 @@
+# Node.js
+node_modules/
+
+# Stream Deck files
+# bin is the built plugin, logs are written while it runs
+*.sdPlugin/bin
+*.sdPlugin/logs
+*.streamDeckPlugin
+
+# Anything that could hold a token. The plugin itself never writes one into
+# this folder (Stream Deck keeps global settings in its own app data), so
+# these are here in case I ever drop one in while testing.
+.env
+.env.*
+*.token
+settings.local.json
