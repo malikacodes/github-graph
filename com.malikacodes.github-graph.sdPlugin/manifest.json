@@ -25,6 +25,29 @@
 					"Image": "imgs/actions/graph/icon"
 				}
 			]
+		},
+		{
+			"Name": "Full-Width Graph",
+			"UUID": "com.malikacodes.github-graph.wide",
+			"Icon": "imgs/actions/wide/icon",
+			"Tooltip": "A whole year across all four dials. Put it on every dial of a page. Turn the first dial to change the year.",
+			"PropertyInspectorPath": "ui/settings.html",
+			"Controllers": [
+				"Encoder"
+			],
+			"Encoder": {
+				"layout": "layouts/wide.json",
+				"TriggerDescription": {
+					"Push": "Refresh",
+					"Rotate": "Change the year (first dial)",
+					"Touch": "Back to the last 12 months"
+				}
+			},
+			"States": [
+				{
+					"Image": "imgs/actions/wide/icon"
+				}
+			]
 		}
 	],
 	"Category": "GitHub Graph",

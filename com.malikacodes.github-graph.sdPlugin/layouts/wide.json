@@ -1,0 +1,39 @@
+{
+	"$schema": "https://schemas.elgato.com/streamdeck/plugins/layout.json",
+	"id": "wide",
+	"items": [
+		{
+			"key": "strip",
+			"type": "pixmap",
+			"rect": [0, 0, 200, 100],
+			"zOrder": 0
+		},
+		{
+			"key": "label",
+			"type": "text",
+			"rect": [146, 10, 52, 18],
+			"font": { "size": 14, "weight": 600 },
+			"color": "#e6edf3",
+			"alignment": "center",
+			"zOrder": 1
+		},
+		{
+			"key": "less",
+			"type": "text",
+			"rect": [146, 70, 26, 12],
+			"font": { "size": 10, "weight": 400 },
+			"color": "#8b949e",
+			"alignment": "left",
+			"zOrder": 1
+		},
+		{
+			"key": "more",
+			"type": "text",
+			"rect": [172, 70, 26, 12],
+			"font": { "size": 10, "weight": 400 },
+			"color": "#8b949e",
+			"alignment": "right",
+			"zOrder": 1
+		}
+	]
+}
