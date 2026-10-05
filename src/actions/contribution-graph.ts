@@ -1,4 +1,4 @@
-import streamDeck, {
+import {
 	action,
 	type DialAction,
 	type DialDownEvent,
@@ -9,42 +9,20 @@ import streamDeck, {
 	type WillDisappearEvent,
 } from "@elgato/streamdeck";
 
+import { weekColumns } from "../calendar";
+import { onChange, refresh, start, store } from "../data";
 import { drawGraph, WEEKS_SHOWN } from "../draw";
-import { type Contributions, fetchContributions } from "../github";
-
-// These are the plugin's global settings, filled in from the settings page.
-// The token lives here and not in the dial's own settings because per-action
-// settings are saved as plain text and travel along when a profile is exported.
-type GlobalSettings = {
-	token?: string;
-	refreshMinutes?: string;
-};
-
-const DEFAULT_MINUTES = 30;
 
 @action({ UUID: "com.malikacodes.github-graph.graph" })
 export class ContributionGraph extends SingletonAction {
 	// Stream Deck makes one of these objects for the whole plugin, even if the
-	// graph is on several dials. So the data is shared, and the only thing
-	// each dial keeps for itself is how far back it's scrolled.
-	private data?: Contributions;
-	private message?: string;
+	// graph is on several dials. The data is in the shared store, so the only
+	// thing each dial keeps for itself is how far back it's scrolled.
 	private weeksBack = new Map<string, number>();
-
-	private started = false;
-	private nextRefresh?: NodeJS.Timeout;
-	private settingsSettled?: NodeJS.Timeout;
 
 	constructor() {
 		super();
-
-		// Fires when something changes on the settings page. The token field
-		// saves while you're still typing or pasting, so wait a second for it
-		// to settle before trying the new token on GitHub.
-		streamDeck.settings.onDidReceiveGlobalSettings(() => {
-			clearTimeout(this.settingsSettled);
-			this.settingsSettled = setTimeout(() => this.refresh(), 1000);
-		});
+		onChange(() => this.showAll());
 	}
 
 	override async onWillAppear(ev: WillAppearEvent): Promise<void> {
@@ -52,13 +30,7 @@ export class ContributionGraph extends SingletonAction {
 
 		this.weeksBack.set(ev.action.id, 0);
 		await this.show(ev.action);
-
-		// The first dial to show up kicks off the first download. After that
-		// the timer in refresh() keeps it going.
-		if (!this.started) {
-			this.started = true;
-			await this.refresh();
-		}
+		start();
 	}
 
 	override onWillDisappear(ev: WillDisappearEvent): void {
@@ -69,13 +41,13 @@ export class ContributionGraph extends SingletonAction {
 	// something even when the numbers come back the same.
 	override async onDialDown(ev: DialDownEvent): Promise<void> {
 		await ev.action.setFeedback({ range: "..." });
-		await this.refresh();
+		await refresh();
 	}
 
 	// Turning left goes back in time, turning right comes forward again.
 	// ticks is negative for a left turn, which is why it's subtracted.
 	override async onDialRotate(ev: DialRotateEvent): Promise<void> {
-		const oldest = Math.max(0, (this.data?.weeks.length ?? 0) - WEEKS_SHOWN);
+		const oldest = Math.max(0, this.columns().length - WEEKS_SHOWN);
 		const current = this.weeksBack.get(ev.action.id) ?? 0;
 		const moved = Math.min(oldest, Math.max(0, current - ev.payload.ticks));
 
@@ -88,29 +60,12 @@ export class ContributionGraph extends SingletonAction {
 		await this.show(ev.action);
 	}
 
-	// Downloads fresh data and redraws every dial. If the download fails,
-	// this.data is left alone, so the last good graph stays up and only the
-	// text line changes to say what went wrong.
-	private async refresh(): Promise<void> {
-		const settings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
+	// The last 12 months, as week columns.
+	private columns(): (string | undefined)[][] {
+		return weekColumns(store.windowStart, store.today);
+	}
 
-		// Restart the countdown on every refresh, whether it came from the
-		// timer, a dial press, or a settings change. That way a manual refresh
-		// doesn't get followed by an automatic one a minute later.
-		const minutes = Number(settings.refreshMinutes) || DEFAULT_MINUTES;
-		clearTimeout(this.nextRefresh);
-		this.nextRefresh = setTimeout(() => this.refresh(), minutes * 60 * 1000);
-
-		const result = await fetchContributions(settings.token?.trim());
-		if (result.ok) {
-			this.data = result.data;
-			this.message = undefined;
-		} else {
-			this.message = result.message;
-			// Only the short message gets logged. The token never goes near the log.
-			streamDeck.logger.warn(`Refresh failed: ${result.message}`);
-		}
-
+	private async showAll(): Promise<void> {
 		for (const dial of this.actions) {
 			if (dial.isDial()) await this.show(dial);
 		}
@@ -123,14 +78,14 @@ export class ContributionGraph extends SingletonAction {
 		const back = this.weeksBack.get(dial.id) ?? 0;
 
 		let total = "Loading...";
-		if (this.message) {
-			total = this.message;
-		} else if (this.data) {
-			total = `${this.data.total.toLocaleString("en-US")} in ${this.data.year}`;
+		if (store.message) {
+			total = store.message;
+		} else if (store.today) {
+			total = `${store.total.toLocaleString("en-US")} in ${store.year}`;
 		}
 
 		await dial.setFeedback({
-			graph: drawGraph(this.data?.weeks ?? [], back),
+			graph: drawGraph(this.columns(), store.days, back),
 			total,
 			range: back === 0 ? "" : `${back} wk back`,
 		});
