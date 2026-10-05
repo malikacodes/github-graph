@@ -90,6 +90,7 @@ export type Recent = {
 	total: number; // contributions since January 1
 	year: number;
 	joined: number; // the year the account was made, so scrolling knows where to stop
+	login: string; // my username, for the link to my profile
 };
 
 // The regular refresh: the last 12 months of days, plus a total counted
@@ -97,6 +98,7 @@ export type Recent = {
 export async function fetchRecent(token: string | undefined): Promise<Result<Recent>> {
 	const year = new Date().getFullYear();
 	const result = await ask<{
+		login: string;
 		createdAt: string;
 		lastYear: Calendar;
 		thisYear: { contributionCalendar: { totalContributions: number } };
@@ -104,6 +106,7 @@ export async function fetchRecent(token: string | undefined): Promise<Result<Rec
 		token,
 		`query($from: DateTime!) {
 			viewer {
+				login
 				createdAt
 				lastYear: contributionsCollection { ${DAYS} }
 				thisYear: contributionsCollection(from: $from) { contributionCalendar { totalContributions } }
@@ -120,6 +123,7 @@ export async function fetchRecent(token: string | undefined): Promise<Result<Rec
 			total: result.data.thisYear.contributionCalendar.totalContributions,
 			year,
 			joined: new Date(result.data.createdAt).getFullYear(),
+			login: result.data.login,
 		},
 	};
 }

@@ -7,7 +7,7 @@
 			"Name": "Contribution Graph",
 			"UUID": "com.malikacodes.github-graph.graph",
 			"Icon": "imgs/actions/graph/icon",
-			"Tooltip": "Shows your GitHub contribution graph. Press to refresh, turn to scroll back, tap to return to this week.",
+			"Tooltip": "Shows your GitHub contribution graph. Turn to change the time range, press to refresh, tap to open your profile.",
 			"PropertyInspectorPath": "ui/settings.html",
 			"Controllers": [
 				"Encoder"
@@ -16,8 +16,8 @@
 				"layout": "layouts/graph.json",
 				"TriggerDescription": {
 					"Push": "Refresh",
-					"Rotate": "Scroll through weeks",
-					"Touch": "Back to this week"
+					"Rotate": "Change the time range",
+					"Touch": "Open my GitHub profile"
 				}
 			},
 			"States": [

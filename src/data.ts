@@ -29,6 +29,7 @@ export const store = {
 	total: 0,
 	year: 0,
 	joined: 0,
+	login: "",
 
 	// Set when the last request failed, cleared when one works. days is
 	// left alone on a failure, so the last good graph stays up.
@@ -97,7 +98,7 @@ export async function refresh(): Promise<void> {
 
 	const result = await fetchRecent(settings.token?.trim());
 	if (result.ok) {
-		const { days, total, year, joined } = result.data;
+		const { days, total, year, joined, login } = result.data;
 		for (const day of days) store.days.set(day.date, day);
 
 		store.windowStart = days[0]?.date ?? "";
@@ -105,6 +106,7 @@ export async function refresh(): Promise<void> {
 		store.total = total;
 		store.year = year;
 		store.joined = joined;
+		store.login = login;
 		store.message = undefined;
 		store.shortMessage = undefined;
 	} else {

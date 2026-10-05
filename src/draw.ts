@@ -40,26 +40,48 @@ function asImage(svg: string): string {
 
 // --- The single dial graph ---
 
-// One dial's slice of the touch strip is 200x100. Squares are 8px with a 2px
-// gap, so each week takes 10px. 19 weeks comes to 188px, which leaves an even
-// 6px margin on both sides. 20 would technically fit but touches the edges.
-// The width and height here have to match the "graph" rect in layouts/graph.json.
-export const WEEKS_SHOWN = 19;
-const STEP = 10;
-const WIDTH = WEEKS_SHOWN * STEP - 2;
-const HEIGHT = 7 * STEP - 2;
+// The graph's box on a single dial is 188x68. These have to match the
+// "graph" rect in layouts/graph.json.
+const WIDTH = 188;
+const HEIGHT = 68;
 
-// weeksBack is how far the dial has been scrolled: 0 puts the current week
-// in the last column.
-export function drawGraph(columns: Columns, days: Map<string, Day>, weeksBack: number): string {
-	const end = columns.length - weeksBack;
-	const visible = columns.slice(Math.max(0, end - WEEKS_SHOWN), end);
+// The 19 week view. Squares are 8px with a 2px gap, so each week takes
+// 10px and 19 of them come to exactly 188. 20 weeks would technically fit
+// on the dial but touches the edges.
+export const WEEKS_SHOWN = 19;
+
+export function drawGraph(columns: Columns, days: Map<string, Day>): string {
+	const visible = columns.slice(-WEEKS_SHOWN);
 
 	// If there are fewer weeks than columns (or none yet), keep them pushed
 	// against the right side so the newest week is always in the same place.
-	const left = (WEEKS_SHOWN - visible.length) * STEP;
+	const left = (WEEKS_SHOWN - visible.length) * 10;
 
-	const content = squares(visible, days, { left, top: 0, size: 8, step: STEP });
+	const content = squares(visible, days, { left, top: 0, size: 8, step: 10 });
+	return asImage(`<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}">${content}</svg>`);
+}
+
+// The shorter ranges. Days run left to right like reading a calendar,
+// perRow to a line, and the whole block is centered in the box. Fewer days
+// means there's room for bigger squares, so step is picked per range.
+export function drawRows(dates: (string | undefined)[], days: Map<string, Day>, perRow: number, step: number): string {
+	const size = step - 2;
+	const rows = Math.ceil(dates.length / perRow);
+	const left = Math.floor((WIDTH - (perRow * step - 2)) / 2);
+	const top = Math.floor((HEIGHT - (rows * step - 2)) / 2);
+
+	// Bigger squares get rounder corners so they keep the same soft look.
+	const corner = size > 12 ? 4 : 2;
+
+	let content = "";
+	dates.forEach((date, i) => {
+		if (!date) return;
+		const day = days.get(date);
+		const x = left + (i % perRow) * step;
+		const y = top + Math.floor(i / perRow) * step;
+		content += `<rect x="${x}" y="${y}" width="${size}" height="${size}" rx="${corner}" fill="${day ? COLORS[day.level] : NO_DATA}"/>`;
+	});
+
 	return asImage(`<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}">${content}</svg>`);
 }
 
