@@ -31,6 +31,15 @@ export const store = {
 	joined: 0,
 	login: "",
 
+	// When the last successful download finished (0 means never), and how
+	// often the timer is set to run. The stats key uses these to say how
+	// fresh the numbers are.
+	fetchedAt: 0,
+	refreshMinutes: DEFAULT_MINUTES,
+
+	// True for a moment after a press, so every view can say "updating".
+	updating: false,
+
 	// Set when the last request failed, cleared when one works. days is
 	// left alone on a failure, so the last good graph stays up.
 	message: undefined as string | undefined,
@@ -66,6 +75,18 @@ export function start(): void {
 		settingsSettled = setTimeout(refresh, 1000);
 	});
 
+	// A timer can be hours late after the Mac has been asleep, so waking up
+	// triggers a refresh of its own. Wi-Fi usually takes a few seconds to
+	// come back, which is why it waits first, and why it gets one more try
+	// if the first one fails. Without that, the dials would say "No
+	// internet" until the next timer came around.
+	streamDeck.system.onSystemDidWakeUp(() => {
+		setTimeout(async () => {
+			await refresh();
+			if (store.message) setTimeout(refresh, 20 * 1000);
+		}, 5 * 1000);
+	});
+
 	void refresh();
 }
 
@@ -93,6 +114,7 @@ export async function refresh(): Promise<void> {
 	// timer, a dial press, or a settings change. That way a manual refresh
 	// doesn't get followed by an automatic one a minute later.
 	const minutes = Number(settings.refreshMinutes) || DEFAULT_MINUTES;
+	store.refreshMinutes = minutes;
 	clearTimeout(nextRefresh);
 	nextRefresh = setTimeout(refresh, minutes * 60 * 1000);
 
@@ -107,12 +129,31 @@ export async function refresh(): Promise<void> {
 		store.year = year;
 		store.joined = joined;
 		store.login = login;
+		store.fetchedAt = Date.now();
 		store.message = undefined;
 		store.shortMessage = undefined;
 	} else {
 		failed(result.message, result.short);
 	}
 
+	changed();
+}
+
+// What a press does on every action. GitHub usually answers in well under
+// a second and the numbers often come back identical, so "updating" stays
+// up for at least a full second. Otherwise there's no way to tell the
+// press did anything.
+//
+// A second press while the first is still going does nothing. Without that,
+// whichever press finished first would turn "updating" off while the other
+// one was still waiting on GitHub.
+export async function refreshNow(): Promise<void> {
+	if (store.updating) return;
+
+	store.updating = true;
+	changed();
+	await Promise.all([refresh(), new Promise((done) => setTimeout(done, 1000))]);
+	store.updating = false;
 	changed();
 }
 

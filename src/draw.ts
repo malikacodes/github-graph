@@ -32,9 +32,9 @@ function squares(
 	return out;
 }
 
-// setFeedback takes an image as a base64 "data URI", which is the whole
+// Stream Deck takes an image as a base64 "data URI", which is the whole
 // picture packed into one long string.
-function asImage(svg: string): string {
+export function asImage(svg: string): string {
 	return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 }
 

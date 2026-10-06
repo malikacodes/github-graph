@@ -48,12 +48,30 @@
 					"Image": "imgs/actions/wide/icon"
 				}
 			]
+		},
+		{
+			"Name": "Contribution Stats",
+			"UUID": "com.malikacodes.github-graph.stats",
+			"Icon": "imgs/actions/stats/icon",
+			"Tooltip": "Your total contributions this year, and how fresh the data is. Press to refresh.",
+			"PropertyInspectorPath": "ui/settings.html",
+			"Controllers": [
+				"Keypad"
+			],
+			"UserTitleEnabled": false,
+			"SupportedInMultiActions": false,
+			"States": [
+				{
+					"Image": "imgs/actions/stats/key",
+					"ShowTitle": false
+				}
+			]
 		}
 	],
 	"Category": "GitHub Graph",
 	"CategoryIcon": "imgs/plugin/category-icon",
 	"CodePath": "bin/plugin.js",
-	"Description": "Shows my GitHub contribution graph on a Stream Deck + dial.",
+	"Description": "Shows my GitHub contributions on a Stream Deck: a graph on the dials and stats on a key.",
 	"Icon": "imgs/plugin/marketplace",
 	"SDKVersion": 3,
 	"Software": {

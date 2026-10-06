@@ -1,6 +1,7 @@
 import streamDeck from "@elgato/streamdeck";
 
 import { ContributionGraph } from "./actions/contribution-graph";
+import { ContributionStats } from "./actions/contribution-stats";
 import { WideGraph } from "./actions/wide-graph";
 
 // Keep this at "info". The "trace" level writes every message between the
@@ -10,6 +11,7 @@ streamDeck.logger.setLevel("info");
 
 streamDeck.actions.registerAction(new ContributionGraph());
 streamDeck.actions.registerAction(new WideGraph());
+streamDeck.actions.registerAction(new ContributionStats());
 
 // connect() has to come last, after the actions are registered.
 streamDeck.connect();

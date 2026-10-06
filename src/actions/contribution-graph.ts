@@ -8,7 +8,7 @@ import streamDeck, {
 } from "@elgato/streamdeck";
 
 import { addDays, weekColumns, weekday } from "../calendar";
-import { onChange, refresh, start, store } from "../data";
+import { onChange, refreshNow, start, store } from "../data";
 import { drawGraph, drawRows, WEEKS_SHOWN } from "../draw";
 
 // The time ranges the dial turns through, in order. words is what goes
@@ -40,9 +40,6 @@ export class ContributionGraph extends SingletonAction<Settings> {
 	// is on, as a position in RANGES.
 	private range = new Map<string, number>();
 
-	// True for a moment after a press, so the dial can say so.
-	private updating = false;
-
 	constructor() {
 		super();
 		onChange(() => this.showAll());
@@ -64,16 +61,8 @@ export class ContributionGraph extends SingletonAction<Settings> {
 		this.range.delete(ev.action.id);
 	}
 
-	// Pressing the dial refreshes. GitHub usually answers in well under a
-	// second and the graph often comes back identical, so "updating" stays
-	// up for at least a full second. Otherwise there's no way to tell the
-	// press did anything.
 	override async onDialDown(): Promise<void> {
-		this.updating = true;
-		await this.showAll();
-		await Promise.all([refresh(), new Promise((done) => setTimeout(done, 1000))]);
-		this.updating = false;
-		await this.showAll();
+		await refreshNow();
 	}
 
 	// Turning steps through the ranges and wraps around at either end, so
@@ -158,7 +147,7 @@ export class ContributionGraph extends SingletonAction<Settings> {
 		await dial.setFeedback({
 			graph,
 			total,
-			range: this.updating ? "updating" : "",
+			range: store.updating ? "updating" : "",
 		});
 	}
 }
