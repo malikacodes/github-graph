@@ -10,3 +10,4 @@ what each line does), how to **check it worked**, and **what went wrong**.
 | # | Entry |
 |---|---|
 | 01 | [Building the contribution graph dial](01-building-the-dial.md) |
+| 02 | [One dial turned into five actions (a.k.a. the rabbit hole)](02-the-rabbit-hole.md) |
