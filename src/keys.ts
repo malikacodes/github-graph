@@ -27,16 +27,15 @@ export function drawStatsKey(year: string, total: string, dot: string, age: stri
 	// A longer number needs smaller digits to stay inside the key.
 	const size = total.length <= 3 ? 60 : total.length <= 5 ? 46 : 36;
 
-	// The bottom line starts from the left and doesn't try to center
-	// itself. Centering means knowing how wide the words are, and that
-	// changes with the font, so the dot would wander. The dot is 12px wide
-	// around x=20, which leaves a 14px margin, and the words start 6px
-	// after it. The longest label, "12 min ago", ends around x=121.
+	// The dot is a character (●) inside the same line of text as the words,
+	// with its own color. That way the dot and the words are one piece, and
+	// asking for that piece to be centered puts both in the middle without
+	// me having to guess how wide the letters come out in whatever font the
+	// key ends up using.
 	return key(
 		`<text x="72" y="34" font-size="20" fill="#8b949e" text-anchor="middle" ${FONT}>${safe(year)}</text>` +
 			`<text x="72" y="${72 + size / 3}" font-size="${size}" font-weight="700" fill="#e6edf3" text-anchor="middle" ${FONT}>${safe(total)}</text>` +
-			`<circle cx="20" cy="121" r="6" fill="${dot}"/>` +
-			`<text x="32" y="127" font-size="18" fill="#8b949e" text-anchor="start" ${FONT}>${safe(age)}</text>`,
+			`<text x="72" y="127" font-size="18" fill="#8b949e" text-anchor="middle" ${FONT}><tspan fill="${dot}">●</tspan> ${safe(age)}</text>`,
 	);
 }
 
