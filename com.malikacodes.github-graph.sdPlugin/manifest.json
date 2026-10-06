@@ -66,6 +66,24 @@
 					"ShowTitle": false
 				}
 			]
+		},
+		{
+			"Name": "Daily Goal",
+			"UUID": "com.malikacodes.github-graph.goal",
+			"Icon": "imgs/actions/goal/icon",
+			"Tooltip": "A ring that fills up as today's contributions reach your daily goal. Press to refresh.",
+			"PropertyInspectorPath": "ui/daily-goal.html",
+			"Controllers": [
+				"Keypad"
+			],
+			"UserTitleEnabled": false,
+			"SupportedInMultiActions": false,
+			"States": [
+				{
+					"Image": "imgs/actions/goal/key",
+					"ShowTitle": false
+				}
+			]
 		}
 	],
 	"Category": "GitHub Graph",

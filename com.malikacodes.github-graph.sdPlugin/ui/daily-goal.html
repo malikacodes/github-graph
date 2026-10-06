@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+
+<head lang="en">
+    <title>Daily Goal Settings</title>
+    <meta charset="utf-8" />
+    <script src="https://sdpi-components.dev/releases/v4/sdpi-components.js"></script>
+</head>
+
+<body>
+    <!--
+        The goal has no "global" on it, so it saves to this one key. Two goal
+        keys can have two different goals. The 1 shown at first is only what
+        the menu displays. Nothing is saved until I pick something, so the
+        plugin also treats a missing goal as 1.
+    -->
+    <sdpi-item label="Daily Goal">
+        <sdpi-select setting="goal" value-type="number" default="1">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+            <option value="15">15</option>
+            <option value="20">20</option>
+        </sdpi-select>
+    </sdpi-item>
+
+    <!--
+        These two have "global" on them, so they save to the plugin's global
+        settings and every GitHub Graph dial and key shares the same token and timer.
+    -->
+    <sdpi-item label="GitHub Token">
+        <sdpi-password setting="token" global placeholder="Paste your token"></sdpi-password>
+    </sdpi-item>
+
+    <sdpi-item label="Refresh Every">
+        <sdpi-select setting="refreshMinutes" global default="30">
+            <option value="5">5 minutes</option>
+            <option value="15">15 minutes</option>
+            <option value="30">30 minutes</option>
+            <option value="60">1 hour</option>
+            <option value="180">3 hours</option>
+        </sdpi-select>
+    </sdpi-item>
+</body>
+
+</html>

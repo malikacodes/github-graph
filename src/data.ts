@@ -88,6 +88,24 @@ export function start(): void {
 	});
 
 	void refresh();
+	refreshAfterMidnight();
+}
+
+// store.today only moves when a refresh happens, so without this the daily
+// goal key would keep showing yesterday's full ring until the regular
+// timer came around, which can be hours. This is an alarm clock set for
+// one minute past midnight on the Mac's clock. When it goes off it
+// refreshes and then sets itself again for the next night. The extra
+// minute is there so GitHub has rolled over too by the time it's asked.
+function refreshAfterMidnight(): void {
+	// Hour 24 doesn't exist, so the date rolls over to tomorrow at 00:01.
+	const alarm = new Date();
+	alarm.setHours(24, 1, 0, 0);
+
+	setTimeout(() => {
+		void refresh();
+		refreshAfterMidnight();
+	}, alarm.getTime() - Date.now());
 }
 
 async function token(): Promise<string | undefined> {
