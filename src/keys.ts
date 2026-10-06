@@ -1,4 +1,5 @@
 import { asImage } from "./draw";
+import { flame } from "./flames";
 
 // Pictures for the regular keys. A key is 72x72 on most Stream Decks and
 // 144x144 on the sharper ones, so these are drawn on a 144 grid and Stream
@@ -214,6 +215,39 @@ export function drawGoalKey(count: string, small: string, smallColor: string, fi
 
 	// The confetti goes on last so it flies over the top of everything.
 	if (burst !== undefined) content += confetti(burst);
+
+	return key(content);
+}
+
+// The streak key: a fire that gets bigger with the streak, the streak
+// itself as a big number, and a small line along the bottom. tier picks
+// the fire, from 0 (nothing lit) to 8. burst is only passed while one is
+// playing, and says how far through it this picture is, from 0 to 1. sway
+// is how far round its always-on sway the fire is, also 0 to 1. The fire
+// itself is drawn in flames.ts.
+export function drawStreakKey(count: string, small: string, smallColor: string, tier: number, burst?: number, sway?: number): string {
+	let content = flame(tier, burst, sway);
+
+	// The small fires sit above the number, but from the hearth up the fire
+	// is behind it, and white digits on bright yellow are hard to read. So
+	// the number gets a dark edge, like the border on a sticker. The edge
+	// is the same digits in the background color, stamped sixteen times in
+	// a small circle around the spot where the real ones go on top. It's
+	// more work than asking for an outline, but plain filled text is
+	// something I know the key can draw.
+	const size = count.length <= 2 ? 48 : count.length === 3 ? 42 : 34;
+	const digits = `font-size="${size}" font-weight="700" text-anchor="middle" ${FONT}>${safe(count)}</text>`;
+	for (let i = 0; i < 16; i++) {
+		const angle = (i * Math.PI) / 8;
+		content += `<text x="${(72 + 4.5 * Math.cos(angle)).toFixed(1)}" y="${(112 + 4.5 * Math.sin(angle)).toFixed(1)}" fill="#0d1117" ${digits}`;
+	}
+
+	// With nothing lit the number is grey, like the coal.
+	content += `<text x="72" y="112" fill="${tier === 0 ? "#8b949e" : "#ffffff"}" ${digits}`;
+
+	// The bottom line. It's empty unless there's something to say:
+	// "updating", or what went wrong.
+	content += `<text x="72" y="137" font-size="17" fill="${smallColor}" text-anchor="middle" ${FONT}>${safe(small)}</text>`;
 
 	return key(content);
 }

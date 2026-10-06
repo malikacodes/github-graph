@@ -84,12 +84,30 @@
 					"ShowTitle": false
 				}
 			]
+		},
+		{
+			"Name": "Streak Counter",
+			"UUID": "com.malikacodes.github-graph.streak",
+			"Icon": "imgs/actions/streak/icon",
+			"Tooltip": "A fire that grows with your contribution streak, with your longest streak underneath. Press to refresh.",
+			"PropertyInspectorPath": "ui/streak.html",
+			"Controllers": [
+				"Keypad"
+			],
+			"UserTitleEnabled": false,
+			"SupportedInMultiActions": false,
+			"States": [
+				{
+					"Image": "imgs/actions/streak/key",
+					"ShowTitle": false
+				}
+			]
 		}
 	],
 	"Category": "GitHub Graph",
 	"CategoryIcon": "imgs/plugin/category-icon",
 	"CodePath": "bin/plugin.js",
-	"Description": "Shows my GitHub contributions on a Stream Deck: a graph on the dials and stats on a key.",
+	"Description": "Shows my GitHub contributions on a Stream Deck: graphs on the dials, and stats, a daily goal and a streak on the keys.",
 	"Icon": "imgs/plugin/marketplace",
 	"SDKVersion": 3,
 	"Software": {

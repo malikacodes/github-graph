@@ -7,6 +7,10 @@ node_modules/
 *.sdPlugin/logs
 *.streamDeckPlugin
 
+# The tier preview page. "npm run preview" builds it fresh from the real
+# drawing code, so it's output and not something to keep.
+preview/tiers.html
+
 # Anything that could hold a token. The plugin itself never writes one into
 # this folder (Stream Deck keeps global settings in its own app data), so
 # these are here in case I ever drop one in while testing.

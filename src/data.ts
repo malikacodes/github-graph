@@ -1,6 +1,6 @@
 import streamDeck from "@elgato/streamdeck";
 
-import { type Day, fetchRecent, fetchYear } from "./github";
+import { type Day, fetchRecent, fetchYear, type Result } from "./github";
 
 // These are the plugin's global settings, filled in from the settings page.
 // The token lives here and not in an action's own settings because those
@@ -44,6 +44,10 @@ export const store = {
 	// left alone on a failure, so the last good graph stays up.
 	message: undefined as string | undefined,
 	shortMessage: undefined as string | undefined,
+
+	// True once every year before this one is in days. Until then a streak
+	// that runs back further than the last 12 months can come out short.
+	historyReady: false,
 };
 
 // Past years never change, so once one is loaded it's kept until Stream
@@ -51,6 +55,10 @@ export const store = {
 // same year several times while the first answer is still on its way.
 const loadedYears = new Set<number>();
 const busyYears = new Set<number>();
+
+// Nobody needs every past year until a streak key is on the deck, so this
+// stays false until one shows up.
+let historyWanted = false;
 
 const listeners: (() => void)[] = [];
 let started = false;
@@ -139,6 +147,15 @@ export async function refresh(): Promise<void> {
 	const result = await fetchRecent(settings.token?.trim());
 	if (result.ok) {
 		const { days, total, year, joined, login } = result.data;
+
+		// A different username means the token now belongs to another
+		// account. Everything from the old one is thrown out first, or two
+		// people's days would end up mixed on the same graph.
+		if (store.login && login !== store.login) {
+			store.days.clear();
+			loadedYears.clear();
+			store.historyReady = false;
+		}
 		for (const day of days) store.days.set(day.date, day);
 
 		store.windowStart = days[0]?.date ?? "";
@@ -155,6 +172,10 @@ export async function refresh(): Promise<void> {
 	}
 
 	changed();
+
+	// Not waited for. The past years can take a few seconds the first time,
+	// and a press shouldn't sit on "updating" for all of it.
+	if (result.ok && historyWanted) void loadHistory();
 }
 
 // What a press does on every action. GitHub usually answers in well under
@@ -181,18 +202,88 @@ export function hasYear(year: number): boolean {
 	return year === store.year || loadedYears.has(year);
 }
 
-export async function loadYear(year: number): Promise<void> {
-	if (hasYear(year) || busyYears.has(year)) return;
+// Asks GitHub for one past year and adds its days to the whiteboard. Both
+// the full-width dial and the streak history get their years through here.
+// What to do when it fails is left to whoever asked, because the two of
+// them want different things.
+async function pullYear(year: number): Promise<Result<Day[]>> {
 	busyYears.add(year);
+	const login = store.login;
 
 	const result = await fetchYear(await token(), year);
-	if (result.ok) {
+
+	// If the token was switched to another account while this was on its
+	// way, the answer belongs to an account that isn't on the whiteboard
+	// any more (or isn't yet), so it's dropped.
+	if (result.ok && login === store.login) {
 		for (const day of result.data) store.days.set(day.date, day);
 		loadedYears.add(year);
-	} else {
-		failed(result.message, result.short);
 	}
 
 	busyYears.delete(year);
+	return result;
+}
+
+// Works out whether every past year is in. It's asked after anything that
+// loads a year, because the last missing one can come from either side:
+// the history loading, or the full-width dial being turned to that year.
+function checkHistory(): void {
+	store.historyReady = true;
+	for (let year = store.joined; year < store.year; year++) {
+		if (!loadedYears.has(year)) store.historyReady = false;
+	}
+}
+
+export async function loadYear(year: number): Promise<void> {
+	if (hasYear(year) || busyYears.has(year)) return;
+
+	const result = await pullYear(year);
+	if (!result.ok) failed(result.message, result.short);
+
+	checkHistory();
 	changed();
+}
+
+// The streak key calls this when it shows up. From then on every refresh
+// also makes sure the past years are in.
+export function wantHistory(): void {
+	if (historyWanted) return;
+	historyWanted = true;
+
+	// If the first download hasn't happened yet there's no "year I joined"
+	// to start from, and the refresh that brings it will start this itself.
+	if (store.fetchedAt) void loadHistory();
+}
+
+// Loads every year from the one I joined GitHub up to last year, one
+// request per year, skipping the ones already here. After the first time
+// there's nothing left to ask for and this does nothing, except in January,
+// when last year becomes a past year and gets picked up.
+//
+// A year that fails here doesn't touch store.message. The last 12 months
+// are fine, so the graphs and the other keys have no reason to turn red.
+// historyReady just stays false, and since this runs after every refresh
+// that works, the missing years get another try then.
+async function loadHistory(): Promise<void> {
+	const wasReady = store.historyReady;
+	let asked = false;
+	for (let year = store.joined; year < store.year; year++) {
+		if (hasYear(year) || busyYears.has(year)) continue;
+		asked = true;
+
+		const result = await pullYear(year);
+		if (!result.ok) {
+			// Whatever stopped this year (no internet, a bad token) would
+			// stop the rest too, so there's no point asking for them now.
+			streamDeck.logger.warn(`Couldn't load ${year} for the streak: ${result.message}`);
+			break;
+		}
+	}
+
+	// Everyone redraws once at the end, not once per year. Nothing on the
+	// keys changes until the whole history is in anyway. An account made
+	// this year has no past years to ask for, and still has to hear that
+	// its history is ready.
+	checkHistory();
+	if (asked || store.historyReady !== wasReady) changed();
 }

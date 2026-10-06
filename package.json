@@ -1,6 +1,8 @@
 {
     "scripts": {
         "build": "rollup -c",
+        "preview": "node preview/tiers.mjs",
+        "test": "node --test test/*.test.ts",
         "watch": "rollup -c -w --watch.onEnd=\"streamdeck restart com.malikacodes.github-graph\""
     },
     "type": "module",
