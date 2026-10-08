@@ -4,6 +4,13 @@ import type { Day } from "./github";
 // GitHub's, because theirs disappears against the strip's black background.
 const COLORS = ["#21262d", "#0e4429", "#006d32", "#26a641", "#39d353"];
 
+// The same five steps with the color taken out. The single dial draws
+// with these when something's off, so a gray graph means "go look at the
+// Status line in the Stream Deck app". In gray, a day with no data gets
+// the lightest gray and not the near-black, so the very first load shows
+// as a faint empty grid and not a blank dial.
+const GRAYS = ["#21262d", "#3a4048", "#59616b", "#7d8590", "#a8b0ba"];
+
 // For a day we have no data for, like the rest of this year that hasn't
 // happened yet. Darker than an empty day, so the shape of the year still
 // shows without looking like a row of days off.
@@ -17,13 +24,14 @@ function squares(
 	columns: Columns,
 	days: Map<string, Day>,
 	at: { left: number; top: number; size: number; step: number },
+	colors = COLORS,
 ): string {
 	let out = "";
 	columns.forEach((week, w) => {
 		week.forEach((date, slot) => {
 			if (!date) return;
 			const day = days.get(date);
-			const fill = day ? COLORS[day.level] : NO_DATA;
+			const fill = day ? colors[day.level] : colors === GRAYS ? GRAYS[0] : NO_DATA;
 			const x = at.left + w * at.step;
 			const y = at.top + slot * at.step;
 			out += `<rect x="${x}" y="${y}" width="${at.size}" height="${at.size}" rx="2" fill="${fill}"/>`;
@@ -40,49 +48,36 @@ export function asImage(svg: string): string {
 
 // --- The single dial graph ---
 
-// The graph's box on a single dial is 188x68. These have to match the
-// "graph" rect in layouts/graph.json.
-const WIDTH = 188;
-const HEIGHT = 68;
+// The picture is the dial's whole 200x100 slice of the strip, with nothing
+// else on it. Seven rows have to fit in 100px, so the squares are 12px
+// with a 2px gap, the same as on the full-width graph. 14 weeks of those
+// is 194px, which leaves 3px on each side.
+export const WEEKS_SHOWN = 14;
 
-// The 19 week view. Squares are 8px with a 2px gap, so each week takes
-// 10px and 19 of them come to exactly 188. 20 weeks would technically fit
-// on the dial but touches the edges.
-export const WEEKS_SHOWN = 19;
-
-export function drawGraph(columns: Columns, days: Map<string, Day>): string {
+export function drawGraph(columns: Columns, days: Map<string, Day>, gray: boolean): string {
 	const visible = columns.slice(-WEEKS_SHOWN);
 
-	// If there are fewer weeks than columns (or none yet), keep them pushed
-	// against the right side so the newest week is always in the same place.
-	const left = (WEEKS_SHOWN - visible.length) * 10;
+	// If there are fewer weeks than columns, keep them pushed against the
+	// right side so the newest week is always in the same place.
+	const left = 3 + (WEEKS_SHOWN - visible.length) * 14;
 
-	const content = squares(visible, days, { left, top: 0, size: 8, step: 10 });
-	return asImage(`<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}">${content}</svg>`);
+	const content = squares(visible, days, { left, top: 2, size: 12, step: 14 }, gray ? GRAYS : COLORS);
+	return asImage(`<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100">${content}</svg>`);
 }
 
-// The shorter ranges. Days run left to right like reading a calendar,
-// perRow to a line, and the whole block is centered in the box. Fewer days
-// means there's room for bigger squares, so step is picked per range.
-export function drawRows(dates: (string | undefined)[], days: Map<string, Day>, perRow: number, step: number): string {
-	const size = step - 2;
-	const rows = Math.ceil(dates.length / perRow);
-	const left = Math.floor((WIDTH - (perRow * step - 2)) / 2);
-	const top = Math.floor((HEIGHT - (rows * step - 2)) / 2);
-
-	// Bigger squares get rounder corners so they keep the same soft look.
-	const corner = size > 12 ? 4 : 2;
+// This week: seven big squares in a row, Sunday to Saturday, across the
+// middle of the dial. Seven of them at 26px with a 2px gap is the same
+// 194px as the graph, so both views line up at the edges.
+export function drawWeek(dates: string[], days: Map<string, Day>, gray: boolean): string {
+	const colors = gray ? GRAYS : COLORS;
 
 	let content = "";
 	dates.forEach((date, i) => {
-		if (!date) return;
 		const day = days.get(date);
-		const x = left + (i % perRow) * step;
-		const y = top + Math.floor(i / perRow) * step;
-		content += `<rect x="${x}" y="${y}" width="${size}" height="${size}" rx="${corner}" fill="${day ? COLORS[day.level] : NO_DATA}"/>`;
+		content += `<rect x="${3 + i * 28}" y="37" width="26" height="26" rx="5" fill="${day ? colors[day.level] : gray ? GRAYS[0] : NO_DATA}"/>`;
 	});
 
-	return asImage(`<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}">${content}</svg>`);
+	return asImage(`<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100">${content}</svg>`);
 }
 
 // --- The full-width graph ---

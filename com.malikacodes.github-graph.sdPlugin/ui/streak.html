@@ -9,6 +9,17 @@
 
 <body>
     <!--
+        What the plugin is up to right now, filled in by status.js. The dial
+        with the graph on it has no words, so when it goes gray this is
+        where the reason shows. The style on it makes the words as tall as
+        a text box, so they sit level with the "Status" label like the
+        other rows do.
+    -->
+    <sdpi-item label="Status">
+        <span id="status" style="display: flex; align-items: center; min-height: 30px;">...</span>
+    </sdpi-item>
+
+    <!--
         These two have no "global" on them, so they save to this one key. Two
         streak keys can count two different ways, like one daily and one
         weekly. What's shown at first (Daily, 1) is only what the page
@@ -54,6 +65,7 @@
             <option value="180">3 hours</option>
         </sdpi-select>
     </sdpi-item>
+    <script src="status.js"></script>
 </body>
 
 </html>

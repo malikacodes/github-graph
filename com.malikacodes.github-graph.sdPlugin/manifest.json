@@ -7,7 +7,7 @@
 			"Name": "Contribution Graph",
 			"UUID": "com.malikacodes.github-graph.graph",
 			"Icon": "imgs/actions/graph/icon",
-			"Tooltip": "Shows your GitHub contribution graph. Turn to change the time range, press to refresh, tap to open your profile.",
+			"Tooltip": "Your recent GitHub contributions. Turn to switch between the graph and this week, press to refresh, tap to open your profile.",
 			"PropertyInspectorPath": "ui/settings.html",
 			"Controllers": [
 				"Encoder"
@@ -16,13 +16,13 @@
 				"layout": "layouts/graph.json",
 				"TriggerDescription": {
 					"Push": "Refresh",
-					"Rotate": "Change the time range",
+					"Rotate": "Graph or this week",
 					"Touch": "Open my GitHub profile"
 				}
 			},
 			"States": [
 				{
-					"Image": "imgs/actions/graph/icon"
+					"Image": "imgs/actions/dial"
 				}
 			]
 		},
@@ -45,7 +45,7 @@
 			},
 			"States": [
 				{
-					"Image": "imgs/actions/wide/icon"
+					"Image": "imgs/actions/dial"
 				}
 			]
 		},

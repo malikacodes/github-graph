@@ -13,41 +13,37 @@ and only says something when it can't reach GitHub.
 
 | Action | What it does | Where it goes |
 |---|---|---|
-| 🟩 Contribution Graph | My recent contributions, in a time range I pick by turning the dial | One dial |
+| 🟩 Contribution Graph | My last 14 weeks, or just this week | One dial |
 | 📅 Full-Width Graph | A whole year, edge to edge | All four dials |
 | 🔢 Contribution Stats | My total for the year, and how fresh the number is | A key |
 | 🎯 Daily Goal | A ring that fills toward my target for today | A key |
 | 🔥 Streak Counter | A fire that grows the longer my streak goes | A key |
 
 All five share one download. GitHub gets asked once, no matter how many of
-them are on screen. Pressing any of them refreshes, and says "updating" for
-a second so I can tell the press did something.
+them are on screen. Pressing any of them refreshes, and each one shows it
+for a second so I can tell the press did something.
 
 ### 🟩 Contribution Graph
 
-![19 weeks on one dial](screenshots/graph-19-weeks.png)
+| The graph | This week |
+|---|---|
+| ![The last 14 weeks on one dial](screenshots/graph.png) | ![This week on one dial](screenshots/graph-this-week.png) |
+
+Two views and no words. The graph is my last 14 weeks, GitHub style. This
+week is seven big squares, Sunday to Saturday, with the days that haven't
+happened yet left dark.
 
 | Do this | And this happens |
 |---|---|
-| ↪️ Turn the dial | Steps through the time ranges, and wraps around at the end |
+| ↪️ Turn the dial | Flips between the graph and this week |
 | 🔘 Press the dial | Refreshes |
 | 👆 Tap the strip | Opens my GitHub profile in the browser |
 
-The text line is the total for whatever range is showing, like
-`390 in 19 weeks`. Each dial remembers its range.
+Each dial remembers which view it's on.
 
-The short ranges get bigger squares, laid out in rows like a calendar:
-
-| 8 weeks | 4 weeks | 14 days |
-|---|---|---|
-| ![8 weeks](screenshots/graph-8-weeks.png) | ![4 weeks](screenshots/graph-4-weeks.png) | ![14 days](screenshots/graph-14-days.png) |
-
-| 7 days | This week | This month |
-|---|---|---|
-| ![7 days](screenshots/graph-7-days.png) | ![This week](screenshots/graph-this-week.png) | ![This month](screenshots/graph-this-month.png) |
-
-In "this week" and "this month", the days that haven't happened yet are
-dark squares.
+If the squares turn gray, something's off: it's refreshing, it couldn't
+reach GitHub, or the token needs a look. The reason is on the **Status**
+line in the dial's settings in the Stream Deck app.
 
 ### 📅 Full-Width Graph
 
@@ -168,17 +164,21 @@ few seconds after the Mac wakes up.
 
 ## If something's wrong
 
-Every action keeps showing the last good data and adds a short message.
-The keys and the full-width graph have less room, so they get a shorter
-version.
+Every action keeps showing the last good data. The keys and the
+full-width graph add a short message. The single dial has no room for
+words, so it turns gray.
 
-| On the dial | On a key | What it means |
-|---|---|---|
-| `Add a token in settings` | `No token` | The token field is empty |
-| `Token didn't work` | `Bad token` | GitHub rejected the token (wrong, expired or deleted) |
-| `Token can't read this` | `No access` | The token is real but isn't allowed to read the profile |
-| `No internet` | `Offline` | The request never reached GitHub |
-| `GitHub error 502` | `Error 502` | GitHub answered with an error. The number is theirs |
+Either way, the full sentence is on the **Status** line at the top of any
+action's settings in the Stream Deck app. When all is well it says
+something like `Up to date. Last checked 2:41 PM.`
+
+| On a key or the full-width graph | What it means |
+|---|---|
+| `No token` | The token field is empty |
+| `Bad token` | GitHub rejected the token (wrong, expired or deleted) |
+| `No access` | The token is real but isn't allowed to read the profile |
+| `Offline` | The request never reached GitHub |
+| `Error 502` | GitHub answered with an error. The number is theirs |
 
 ## Why I built it this way
 
@@ -189,9 +189,13 @@ version.
   is 103 pixels tall on a 100 pixel strip. So the squares are 12 pixels,
   the graph is 740 wide, and the leftover column holds the year and the
   Less to More legend.
-- **Short ranges aren't drawn GitHub style.** Seven rows cap the squares at
-  8 pixels however few weeks there are, so 4 weeks would be a sliver in the
-  middle of the dial. Rows of days let the squares grow.
+- **The single dial is two views and no words.** It used to have seven
+  time ranges and a line of text on top. Once I lived with it, that was a
+  lot to turn through for a glance. I kept the two I actually look at, and
+  with the text gone the squares got as big as the ones on the full-width
+  graph. The year total it used to show lives on the stats key.
+- **Gray means go look.** A dial with no words can't tell me what's wrong,
+  so it goes gray and the Status line in the app does the talking.
 - **Old years are fetched once.** A streak can run back further than the
   12 months a refresh brings in, so the streak key needs the older years
   too. Past years never change, so they're loaded one time when a streak

@@ -83,6 +83,12 @@ export function start(): void {
 		settingsSettled = setTimeout(refresh, 1000);
 	});
 
+	// A settings page asks for the status when it opens (see ui/status.js).
+	// After that, changed() keeps it up to date for as long as it's open.
+	streamDeck.ui.onSendToPlugin(() => {
+		void streamDeck.ui.sendToPropertyInspector(status());
+	});
+
 	// A timer can be hours late after the Mac has been asleep, so waking up
 	// triggers a refresh of its own. Wi-Fi usually takes a few seconds to
 	// come back, which is why it waits first, and why it gets one more try
@@ -130,6 +136,36 @@ function failed(message: string, short: string): void {
 
 function changed(): void {
 	for (const redraw of listeners) redraw();
+	void streamDeck.ui.sendToPropertyInspector(status());
+}
+
+// What's going on, as one plain sentence for the Status line on the
+// settings pages. The single dial has no words on it and just goes gray
+// when something's off, so this is where the reason lives. It's words
+// only. The token never goes in here. The cases are the messages that
+// github.ts hands back, so a reworded message there needs rewording here.
+function status(): string {
+	if (store.updating) return "Checking GitHub...";
+
+	switch (store.message) {
+		case undefined:
+			break;
+		case "Add a token in settings":
+			return "Add a token below.";
+		case "No internet":
+			return "No internet. Showing the last numbers I got.";
+		case "Token didn't work":
+			return "The token didn't work. It may have expired.";
+		case "Token can't read this":
+			return "The token isn't allowed to read my profile.";
+		default:
+			return `${store.message}. It usually clears up on its own.`;
+	}
+
+	if (!store.fetchedAt) return "Loading...";
+
+	const time = new Date(store.fetchedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+	return `Up to date. Last checked ${time}.`;
 }
 
 // Downloads the last 12 months again and tells every action to redraw.
