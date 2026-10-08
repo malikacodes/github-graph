@@ -7,9 +7,14 @@ import { flame } from "./flames";
 
 const FONT = `font-family="Helvetica Neue, Helvetica, Arial, sans-serif"`;
 
+// Every key is plain black. They started out in GitHub's dark gray
+// (#0d1117), but on the deck that showed up as a gray square next to the
+// keys around it, which are black.
+const BLACK = "#000000";
+
 function key(content: string): string {
 	return asImage(
-		`<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144"><rect width="144" height="144" fill="#0d1117"/>${content}</svg>`,
+		`<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144"><rect width="144" height="144" fill="${BLACK}"/>${content}</svg>`,
 	);
 }
 
@@ -171,7 +176,7 @@ export function drawGoalKey(count: string, small: string, smallColor: string, fi
 			const reach = i % 2 ? 6 : 14;
 			points += `${(108.8 + reach * Math.sin(angle)).toFixed(1)},${(35.2 - reach * Math.cos(angle)).toFixed(1)} `;
 		}
-		content += `<polygon points="${points.trim()}" fill="#ffd33d" stroke="#0d1117" stroke-width="2.5" stroke-linejoin="round"/>`;
+		content += `<polygon points="${points.trim()}" fill="#ffd33d" stroke="${BLACK}" stroke-width="2.5" stroke-linejoin="round"/>`;
 	}
 
 	// During the celebration a checkmark takes the place of the words. It
@@ -238,7 +243,7 @@ export function drawStreakKey(count: string, small: string, smallColor: string, 
 	const digits = `font-size="${size}" font-weight="700" text-anchor="middle" ${FONT}>${safe(count)}</text>`;
 	for (let i = 0; i < 16; i++) {
 		const angle = (i * Math.PI) / 8;
-		content += `<text x="${(72 + 4.5 * Math.cos(angle)).toFixed(1)}" y="${(112 + 4.5 * Math.sin(angle)).toFixed(1)}" fill="#0d1117" ${digits}`;
+		content += `<text x="${(72 + 4.5 * Math.cos(angle)).toFixed(1)}" y="${(112 + 4.5 * Math.sin(angle)).toFixed(1)}" fill="${BLACK}" ${digits}`;
 	}
 
 	// With nothing lit the number is grey, like the coal.
