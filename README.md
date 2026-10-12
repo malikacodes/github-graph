@@ -29,9 +29,10 @@ for a second so I can tell the press did something.
 |---|---|
 | ![The last 14 weeks on one dial](screenshots/graph.png) | ![This week on one dial](screenshots/graph-this-week.png) |
 
-Two views and no words. The graph is my last 14 weeks, GitHub style. This
-week is seven big squares, Sunday to Saturday, with the days that haven't
-happened yet left dark.
+Two views and no words. The graph is my last 14 weeks, GitHub style, and
+the week I'm in is always drawn whole: the days that haven't happened yet
+are a shade dimmer, and fill in as I go. This week is seven big squares,
+Sunday to Saturday, with the days still to come left dark.
 
 | Do this | And this happens |
 |---|---|

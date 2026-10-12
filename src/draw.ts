@@ -6,10 +6,13 @@ const COLORS = ["#21262d", "#0e4429", "#006d32", "#26a641", "#39d353"];
 
 // The same five steps with the color taken out. The single dial draws
 // with these when something's off, so a gray graph means "go look at the
-// Status line in the Stream Deck app". In gray, a day with no data gets
-// the lightest gray and not the near-black, so the very first load shows
-// as a faint empty grid and not a blank dial.
+// Status line in the Stream Deck app".
 const GRAYS = ["#21262d", "#3a4048", "#59616b", "#7d8590", "#a8b0ba"];
+
+// The rest of this week on the single dial: days that haven't happened
+// yet. One shade darker than an empty day, so the graph still looks full
+// but I can tell "not yet" from "nothing that day".
+const UPCOMING = "#1a1e24";
 
 // For a day we have no data for, like the rest of this year that hasn't
 // happened yet. Darker than an empty day, so the shape of the year still
@@ -20,18 +23,20 @@ type Columns = (string | undefined)[][];
 
 // Draws week columns as rounded squares, starting at (left, top). Each
 // square is size wide, and step is the distance from one to the next.
+// missing is the color for a date there's no data for.
 function squares(
 	columns: Columns,
 	days: Map<string, Day>,
 	at: { left: number; top: number; size: number; step: number },
 	colors = COLORS,
+	missing = NO_DATA,
 ): string {
 	let out = "";
 	columns.forEach((week, w) => {
 		week.forEach((date, slot) => {
 			if (!date) return;
 			const day = days.get(date);
-			const fill = day ? colors[day.level] : colors === GRAYS ? GRAYS[0] : NO_DATA;
+			const fill = day ? colors[day.level] : missing;
 			const x = at.left + w * at.step;
 			const y = at.top + slot * at.step;
 			out += `<rect x="${x}" y="${y}" width="${at.size}" height="${at.size}" rx="2" fill="${fill}"/>`;
@@ -56,12 +61,19 @@ export const WEEKS_SHOWN = 14;
 
 export function drawGraph(columns: Columns, days: Map<string, Day>, gray: boolean): string {
 	const visible = columns.slice(-WEEKS_SHOWN);
+	const colors = gray ? GRAYS : COLORS;
 
 	// If there are fewer weeks than columns, keep them pushed against the
 	// right side so the newest week is always in the same place.
 	const left = 3 + (WEEKS_SHOWN - visible.length) * 14;
 
-	const content = squares(visible, days, { left, top: 2, size: 12, step: 14 }, gray ? GRAYS : COLORS);
+	// The rest of this week gets squares too. That keeps the graph a full
+	// rectangle on a Monday, when the last column would otherwise be two
+	// squares and a hole. In gray there's no data at all on
+	// the very first load, so those squares get the lightest gray and the
+	// dial shows a faint grid, not nothing.
+	const missing = gray ? GRAYS[0] : UPCOMING;
+	const content = squares(visible, days, { left, top: 2, size: 12, step: 14 }, colors, missing);
 	return asImage(`<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100">${content}</svg>`);
 }
 

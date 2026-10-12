@@ -94,8 +94,10 @@ export class ContributionGraph extends SingletonAction<Settings> {
 			const dates = [0, 1, 2, 3, 4, 5, 6].map((i) => addDays(sunday, i));
 			graph = drawWeek(dates, store.days, gray);
 		} else {
-			// Start on the Sunday 13 weeks before this week, GitHub style.
-			const columns = weekColumns(addDays(sunday, -(WEEKS_SHOWN - 1) * 7), today);
+			// Start on the Sunday 13 weeks before this week, GitHub style,
+			// and run to this Saturday. The days that haven't happened
+			// yet get squares too, so the last column is always whole.
+			const columns = weekColumns(addDays(sunday, -(WEEKS_SHOWN - 1) * 7), addDays(sunday, 6));
 			graph = drawGraph(columns, store.days, gray);
 		}
 
