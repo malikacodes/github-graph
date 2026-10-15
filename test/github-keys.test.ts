@@ -1,9 +1,10 @@
 import assert from "node:assert";
 import { test } from "node:test";
 
-import { drawGithubKey } from "../src/key-art.ts";
-import { issueLesson, pullLesson, runLesson } from "../src/learn.ts";
-import { ago, stepRepo, whichRepo } from "../src/picking.ts";
+import { fetchCommitWeeks } from "../src/github.ts";
+import { drawGithubKey, weekBars } from "../src/key-art.ts";
+import { compareLesson, issueLesson, pullLesson, runLesson, statOf } from "../src/learn.ts";
+import { ago, pickBranches, stepRepo, whichRepo } from "../src/picking.ts";
 
 const NOW = Date.parse("2026-10-15T12:00:00Z");
 
@@ -99,4 +100,65 @@ test("lessons: right now reads naturally for none, one and many", () => {
 // that isn't an error.
 test("lessons: a repo with no workflows says so calmly", () => {
 	assert.strictEqual(runLesson("house-os", { workflows: 0 }, undefined, NOW).now, "house-os has no workflows yet, so nothing runs on a push.");
+});
+
+// Protects Branch Comparison working with no setup: blank settings compare
+// the newest branch that isn't main against main.
+test("pickBranches: blank means main and the newest other branch", () => {
+	const names = ["main", "fix-login", "old-idea"];
+	assert.deepStrictEqual(pickBranches(["fix-login", "main", "old-idea"], "main", "", ""), { base: "main", head: "fix-login" });
+	assert.deepStrictEqual(pickBranches(names, "main", "old-idea", ""), { base: "old-idea", head: "main" });
+	assert.deepStrictEqual(pickBranches(names, "main", undefined, "old-idea"), { base: "main", head: "old-idea" });
+	assert.deepStrictEqual(pickBranches(["main"], "main", "", ""), { base: "main", head: undefined });
+});
+
+// Protects the "ahead / behind" sentences, including the squash-merge case
+// that looks ahead forever.
+test("compareLesson: says ahead, behind and both in plain words", () => {
+	const view = (ahead: number, behind: number) => ({
+		main: "main",
+		names: [],
+		comparison: { base: "main", head: "my-words", ahead, behind, url: "" },
+	});
+	assert.strictEqual(compareLesson("leak-flow", view(2, 0), undefined).now, "my-words has 2 commits that main doesn't.");
+	assert.strictEqual(compareLesson("leak-flow", view(0, 1), undefined).now, "my-words is missing 1 commit from main.");
+	assert.strictEqual(compareLesson("leak-flow", view(0, 0), undefined).now, "my-words and main are the same right now.");
+	assert.strictEqual(compareLesson("leak-flow", { main: "main", names: ["main"] }, undefined).now, "leak-flow only has main, so there's nothing to compare yet.");
+});
+
+// Protects the Show setting from a value it doesn't know.
+test("statOf: unknown or blank falls back to stars", () => {
+	assert.strictEqual(statOf("forks"), "forks");
+	assert.strictEqual(statOf(undefined), "stars");
+	assert.strictEqual(statOf("toString"), "stars");
+});
+
+// Protects the commit bars: eight bars, empty weeks still visible as faint
+// stubs, and the busiest week as the tallest bar.
+test("weekBars: a bar per week, faint stubs for empty weeks", () => {
+	const drawn = weekBars([0, 0, 0, 0, 0, 9, 6, 5], "#58a6ff");
+	assert.strictEqual((drawn.match(/<rect /g) ?? []).length, 8);
+	assert.strictEqual((drawn.match(/opacity="0.35"/g) ?? []).length, 5);
+	assert.ok(drawn.includes('height="40"'));
+});
+
+// Protects the "GitHub is still counting" wait. The first ask for a repo's
+// weekly numbers can come back 202 with an empty body. This pretends to be
+// GitHub for one call, then answers properly.
+test("fetchCommitWeeks: waits out a 202, then keeps the last eight weeks", async () => {
+	const real = globalThis.fetch;
+	let calls = 0;
+	globalThis.fetch = (async () => {
+		calls++;
+		if (calls === 1) return new Response("{}", { status: 202 });
+		const weeks = Array.from({ length: 52 }, (_, i) => ({ total: i }));
+		return new Response(JSON.stringify(weeks), { status: 200 });
+	}) as typeof fetch;
+	try {
+		const result = await fetchCommitWeeks("token", "me", "repo", async () => {});
+		assert.deepStrictEqual(result, { ok: true, data: [44, 45, 46, 47, 48, 49, 50, 51] });
+		assert.strictEqual(calls, 2);
+	} finally {
+		globalThis.fetch = real;
+	}
 });

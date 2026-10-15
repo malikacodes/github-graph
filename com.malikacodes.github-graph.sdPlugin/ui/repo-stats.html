@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+
+<head lang="en">
+    <title>Repo Stats Settings</title>
+    <meta charset="utf-8" />
+    <script src="https://sdpi-components.dev/releases/v4/sdpi-components.js"></script>
+    <link rel="stylesheet" href="github-key.css" />
+</head>
+
+<body>
+    <!--
+        Shared by the GitHub keys that only need a repo. The repo picker is
+        hand built (picker.js), and every row under it is filled in by the
+        plugin (learn.js), so "Right now" matches the key while this is open.
+    -->
+    <sdpi-item label="Repo">
+        <div id="picker"></div>
+    </sdpi-item>
+    <sdpi-item label="Show">
+        <sdpi-select setting="stat" default="stars">
+            <option value="stars">Stars</option>
+            <option value="forks">Forks</option>
+            <option value="watchers">Watchers</option>
+            <option value="language">Language</option>
+        </sdpi-select>
+    </sdpi-item>
+
+    <sdpi-item label="This is">
+        <div class="words" id="this-is">...</div>
+    </sdpi-item>
+    <sdpi-item label="Right now">
+        <div class="words" id="now"></div>
+    </sdpi-item>
+    <sdpi-item label="Normal">
+        <div class="words"><ul id="normal"></ul></div>
+    </sdpi-item>
+    <sdpi-item label="Words to know">
+        <div class="words"><ul id="words"></ul></div>
+    </sdpi-item>
+    <sdpi-item label="Try this">
+        <div class="words" id="try"></div>
+    </sdpi-item>
+    <sdpi-item label="A press">
+        <div class="words" id="press"></div>
+    </sdpi-item>
+
+    <!-- The same token and timer every GitHub Graph action shares. -->
+    <sdpi-item label="GitHub Token">
+        <sdpi-password setting="token" global placeholder="Paste your token"></sdpi-password>
+    </sdpi-item>
+    <sdpi-item label="Refresh Every">
+        <sdpi-select setting="refreshMinutes" global default="30">
+            <option value="5">5 minutes</option>
+            <option value="15">15 minutes</option>
+            <option value="30">30 minutes</option>
+            <option value="60">1 hour</option>
+            <option value="180">3 hours</option>
+        </sdpi-select>
+    </sdpi-item>
+
+    <script src="picker.js"></script>
+    <script src="learn.js"></script>
+</body>
+
+</html>

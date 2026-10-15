@@ -17,10 +17,14 @@ import { drawGithubKey } from "../key-art";
 import type { Lesson } from "../learn";
 import { whichRepo } from "../picking";
 
-// A key's one setting: the repo it's pinned to. Empty means it follows the
-// Repo key, and every new key starts that way.
+// A key's settings. repo is the repo it's pinned to: empty means it
+// follows the Repo key, and every new key starts that way. The rest belong
+// to one kind of key each.
 export type KeySettings = {
 	repo?: string;
+	stat?: string; // Repo Stats: which number to show
+	base?: string; // Branch Comparison: the branch to compare against
+	head?: string; // Branch Comparison: the branch being compared
 };
 
 // What a key knows about one repo. data stays after a failed refresh, so
@@ -44,10 +48,20 @@ let nextStagger = 0;
 // load its numbers, how to draw them, what its settings page teaches, and
 // where a press goes.
 export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
-	protected abstract load(token: string | undefined, owner: string, name: string): Promise<Result<T>>;
-	protected abstract face(data: T, repo: string): Face;
-	protected abstract lesson(repo: string | undefined, data: T | undefined, message: string | undefined): Lesson;
-	protected abstract link(data: T | undefined, repo: string, url: string): string;
+	protected abstract load(token: string | undefined, owner: string, name: string, settings: KeySettings): Promise<Result<T>>;
+	protected abstract face(data: T, repo: string, settings: KeySettings): Face;
+	protected abstract lesson(repo: string | undefined, data: T | undefined, message: string | undefined, settings: KeySettings): Lesson;
+	protected abstract link(data: T | undefined, repo: string, url: string, settings: KeySettings): string;
+
+	// Which of this key's settings change what it asks GitHub. Answers are
+	// saved per repo plus these, so two keys on the same repo with different
+	// branches never show each other's numbers.
+	protected variant(_: KeySettings): string {
+		return "";
+	}
+
+	// For a settings page question other than the two every key answers.
+	protected async answer(_event: string, _id: string, _repo: string | undefined): Promise<void> {}
 
 	// The drawing and color this key uses while loading or when it's stuck.
 	protected abstract readonly look: Pick<Face, "icon" | "color">;
@@ -60,7 +74,7 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 
 	constructor() {
 		super();
-		onFocus(() => void this.refreshAll());
+		onFocus(() => void this.followed());
 
 		// Same rule as the Branch Map: only a real change to the token or
 		// the timer counts, or an echo of the same settings would set off a
@@ -83,17 +97,18 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 		await this.show(ev.action);
 
 		if (!this.timer) this.timer = setTimeout(() => this.refreshAll(), this.stagger);
-		else await this.refresh(this.repoOf(ev.action.id));
+		else await this.refresh(ev.action.id);
 	}
 
 	override onWillDisappear(ev: WillDisappearEvent<KeySettings>): void {
 		this.settings.delete(ev.action.id);
+		this.sent.delete(ev.action.id);
 	}
 
 	override async onDidReceiveSettings(ev: DidReceiveSettingsEvent<KeySettings>): Promise<void> {
 		this.settings.set(ev.action.id, ev.payload.settings);
 		if (ev.action.isKey()) await this.show(ev.action);
-		await this.refresh(this.repoOf(ev.action.id));
+		await this.refresh(ev.action.id);
 		await this.explain(ev.action.id);
 	}
 
@@ -101,22 +116,34 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 	override async onKeyDown(ev: KeyDownEvent<KeySettings>): Promise<void> {
 		const repo = this.repoOf(ev.action.id);
 		if (!repo) return;
-		const known = this.known.get(repo);
+		const known = this.known.get(this.keyOf(ev.action.id)!);
 		const login = await owner();
 		const parsed = parseRepo(repo);
 		const url = `https://github.com/${parsed?.owner ?? (login.ok ? login.data : "")}/${parsed?.name ?? repo}`;
-		await streamDeck.system.openUrl(this.link(known?.data, repo, url));
+		await streamDeck.system.openUrl(this.link(known?.data, repo, url, this.settingsOf(ev.action.id)));
 	}
 
 	// The settings page asks for two things: its learning rows, and the repo
 	// list for the picker.
 	override async onSendToPlugin(ev: SendToPluginEvent<{ event?: string }, KeySettings>): Promise<void> {
-		if (ev.payload?.event === "explain") await this.explain(ev.action.id);
-		if (ev.payload?.event === "getRepos") await sendRepos(this.settings.get(ev.action.id)?.repo ?? "", true);
+		const event = ev.payload?.event ?? "";
+		if (event === "explain") await this.explain(ev.action.id);
+		else if (event === "getRepos") await sendRepos(this.settingsOf(ev.action.id).repo ?? "", true);
+		else await this.answer(event, ev.action.id, this.repoOf(ev.action.id));
 	}
 
-	private repoOf(id: string): string | undefined {
-		return whichRepo(this.settings.get(id)?.repo, focus.repo);
+	private settingsOf(id: string): KeySettings {
+		return this.settings.get(id) ?? {};
+	}
+
+	protected repoOf(id: string): string | undefined {
+		return whichRepo(this.settingsOf(id).repo, focus.repo);
+	}
+
+	// The name a key's answer is saved under: its repo plus its variant.
+	private keyOf(id: string): string | undefined {
+		const repo = this.repoOf(id);
+		return repo && `${repo}|${this.variant(this.settingsOf(id))}`;
 	}
 
 	// Refreshes every repo a key of this kind is showing, then sets the
@@ -127,18 +154,22 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 		clearTimeout(this.timer);
 		this.timer = setTimeout(() => this.refreshAll(), minutes * 60 * 1000);
 
-		const repos = new Set([...this.settings.keys()].map((id) => this.repoOf(id)));
+		// One refresh per different answer, not per key: two keys showing
+		// the same thing share it.
+		const ids = new Map([...this.settings.keys()].map((id) => [this.keyOf(id), id]));
 		await this.showAll();
-		for (const repo of repos) await this.refresh(repo, true);
+		for (const id of ids.values()) await this.refresh(id, true);
 	}
 
-	// Asks GitHub about one repo, unless it was asked in the last minute
-	// (several keys of the same kind on one repo, or switching back and
-	// forth on the Repo key). force is for the timer.
-	private async refresh(repo: string | undefined, force = false): Promise<void> {
-		if (!repo) return;
-		const known = this.known.get(repo) ?? { at: 0, busy: false };
-		this.known.set(repo, known);
+	// Asks GitHub what one key needs, unless the same thing was asked in the
+	// last minute (several keys showing the same thing, or switching back
+	// and forth on the Repo key). force is for the timer.
+	private async refresh(id: string, force = false): Promise<void> {
+		const repo = this.repoOf(id);
+		const name = this.keyOf(id);
+		if (!repo || !name) return this.showAll();
+		const known = this.known.get(name) ?? { at: 0, busy: false };
+		this.known.set(name, known);
 		if (known.busy || (!force && Date.now() - known.at < 60 * 1000)) return this.showAll();
 
 		known.busy = true;
@@ -148,7 +179,7 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 			? { ok: false, message: "That isn't a repo name", short: "Bad name" }
 			: !login.ok
 				? login
-				: await this.load(await token(), login.data, parsed.name);
+				: await this.load(await token(), login.data, parsed.name, this.settingsOf(id));
 
 		known.busy = false;
 		known.at = Date.now();
@@ -166,6 +197,15 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 		if (open && this.settings.has(open.id)) await this.explain(open.id);
 	}
 
+	// A new repo on the Repo key: every key that follows it asks about the
+	// new repo (unless it already did in the last minute).
+	private async followed(): Promise<void> {
+		await this.showAll();
+		for (const id of this.settings.keys()) {
+			if (!this.settingsOf(id).repo) await this.refresh(id);
+		}
+	}
+
 	private async showAll(): Promise<void> {
 		for (const key of this.actions) {
 			if (key.isKey()) await this.show(key);
@@ -176,13 +216,13 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 
 	private async show(key: KeyAction<KeySettings>): Promise<void> {
 		const repo = this.repoOf(key.id);
-		const known = repo ? this.known.get(repo) : undefined;
+		const known = repo ? this.known.get(this.keyOf(key.id)!) : undefined;
 
 		// The last good numbers win over a failure, so a short wifi drop
 		// doesn't blank the key. The reason is still on the settings page.
 		let face: Face;
 		if (!repo) face = { ...this.look, big: "–", small: "pick a repo", quiet: true };
-		else if (known?.data) face = { ...this.face(known.data, repo), lock: isPrivate(repo) };
+		else if (known?.data) face = { ...this.face(known.data, repo, this.settingsOf(key.id)), lock: isPrivate(repo) };
 		else if (known?.message) face = { ...this.look, big: "–", small: known.short ?? "can't check", quiet: true, alarm: true };
 		else face = { ...this.look, big: "–", small: "loading", quiet: true };
 
@@ -197,9 +237,9 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 	private async explain(id: string): Promise<void> {
 		if (streamDeck.ui.action?.id !== id) return;
 		const repo = this.repoOf(id);
-		const known = repo ? this.known.get(repo) : undefined;
+		const known = repo ? this.known.get(this.keyOf(id)!) : undefined;
 		const message = known?.data ? undefined : known?.message;
-		await streamDeck.ui.sendToPropertyInspector({ event: "explain", lesson: this.lesson(repo, known?.data, message) });
+		await streamDeck.ui.sendToPropertyInspector({ event: "explain", lesson: this.lesson(repo, known?.data, message, this.settingsOf(id)) });
 	}
 }
 
