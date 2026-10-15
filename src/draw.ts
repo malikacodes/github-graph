@@ -138,6 +138,11 @@ const MAIN_COLOR = "#58a6ff";
 const QUIET = "#8b949e";
 const FONT = "Helvetica, Arial, sans-serif";
 
+// Dash then gap, in pixels, for a branch that's only on my Mac. The caps
+// are round, which stretches each dash by the line's width, so the gap has
+// to be wider than it looks here to still show.
+const DASHES = "4 6";
+
 // The lanes that aren't picked fade back to this much of their color.
 // That's dark color over black, not gray, so nothing turns into a gray
 // square next to the deck's own black.
@@ -159,19 +164,24 @@ function escape(text: string): string {
 // then the letters get smaller, and only a really long name on one dial
 // gets cut.
 function nameLine(lane: Placed, width: number): string {
-	const when = lane.open
-		? "still open"
-		: `merged ${new Date(lane.merged!).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+	const when = lane.local
+		? "only on my Mac"
+		: lane.open
+			? "still open"
+			: `merged ${new Date(lane.merged!).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
 	const room = width - 8;
 	const fits = (text: string, size: number) => text.length * size * LETTER <= room;
+
+	// A "*" after the name means uncommitted changes, the same way a lot of
+	// terminal prompts show it.
+	let name = lane.dirty ? `${lane.name}*` : lane.name;
 
 	let size = 11;
 	// The "  ·  " is only for measuring how much room the line needs.
 	let extra = `  ·  ${when}`;
-	if (!fits(lane.name + extra, size)) extra = "";
-	if (!fits(lane.name, size)) size = 9;
+	if (!fits(name + extra, size)) extra = "";
+	if (!fits(name, size)) size = 9;
 
-	let name = lane.name;
 	const letters = Math.floor(room / (size * LETTER));
 	if (name.length > letters) name = `${name.slice(0, letters - 1)}…`;
 
@@ -226,7 +236,10 @@ export function drawBranches(
 			// straight slant.
 			const down = `C${from + slant / 2},${MAIN_Y} ${from + slant / 2},${y} ${from + slant},${y}`;
 			const up = `L${to - slant},${y} C${to - slant / 2},${y} ${to - slant / 2},${MAIN_Y} ${to},${MAIN_Y}`;
-			let part = `<path d="M${from},${MAIN_Y} ${down} ${lane.open ? `L${to},${y}` : up}" fill="none" stroke="${lane.color}" stroke-width="2.5" stroke-linecap="round"/>`;
+			// A branch that's only on my Mac is dashed, like a route that's
+			// planned but not built yet.
+			const dashes = lane.local ? ` stroke-dasharray="${DASHES}"` : "";
+			let part = `<path d="M${from},${MAIN_Y} ${down} ${lane.open ? `L${to},${y}` : up}" fill="none" stroke="${lane.color}" stroke-width="2.5" stroke-linecap="round"${dashes}/>`;
 
 			// Rings on main where the lane leaves and comes back, filled with
 			// black so main's line doesn't show through them.
@@ -234,6 +247,13 @@ export function drawBranches(
 			part += lane.open
 				? `<circle cx="${to}" cy="${y}" r="3" fill="${lane.color}"/>`
 				: `<circle cx="${to}" cy="${MAIN_Y}" r="3.5" fill="#000000" stroke="${lane.color}" stroke-width="2"/>`;
+
+			// Uncommitted changes get a ring around the end dot, so I can spot
+			// them without picking the lane. A loop has no end dot, so it only
+			// gets the "*" in its name.
+			if (lane.open && lane.dirty) {
+				part += `<circle cx="${to}" cy="${y}" r="6" fill="none" stroke="${lane.color}" stroke-width="1.5"/>`;
+			}
 
 			// The picked lane is drawn last so it sits on top where lanes cross.
 			if (i === picked) bright = part;

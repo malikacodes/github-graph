@@ -7,10 +7,22 @@ export type Lane = {
 	start: string;
 	end?: string;
 	pr?: number; // the pull request it merged through
+	local?: boolean; // only on my Mac, never pushed
+	dirty?: boolean; // checked out, with changes I haven't committed
+};
+
+// What git on my Mac says about the same repo. branches are my local
+// branches other than main, in the same shape as GitHub's. current is the
+// branch I have checked out, and dirty means it has uncommitted changes.
+export type Local = {
+	branches: { name: string; oid: string; ahead: number; firstCommit?: string }[];
+	current?: string;
+	dirty: boolean;
 };
 
 // Sorts what GitHub sent into lanes: a loop for every merged pull request,
-// and an open lane for every branch with work main doesn't have yet.
+// and an open lane for every branch with work main doesn't have yet. Branches
+// that only exist on my Mac get open lanes too, when local is there.
 //
 // The tricky one is a merged branch I never deleted. My pull requests get
 // squash merged, which copies the work onto main as one new commit, so
@@ -18,15 +30,83 @@ export type Lane = {
 // "ahead of main" were the only test, every old branch would show as open.
 // So a branch that's still on exactly the commit its pull request merged
 // from counts as merged. One with new commits after that is open again.
-export function lanesFrom(network: Network): Lane[] {
+// The same goes for a local branch whose pull request merged and whose
+// GitHub copy got deleted: my Mac still has it, sitting on that commit.
+export function lanesFrom(network: Network, local?: Local): Lane[] {
 	const mergedTips = new Set(network.merged.map((pr) => pr.oid));
+	const isOpen = (branch: Network["branches"][number]) =>
+		branch.ahead > 0 && branch.firstCommit !== undefined && !mergedTips.has(branch.oid);
 
 	const lanes: Lane[] = network.merged.map((pr) => ({ name: pr.branch, start: pr.start, end: pr.mergedAt, pr: pr.number }));
-	for (const branch of network.branches) {
-		if (branch.ahead === 0 || !branch.firstCommit || mergedTips.has(branch.oid)) continue;
-		lanes.push({ name: branch.name, start: branch.firstCommit });
+	for (const branch of network.branches.filter(isOpen)) {
+		lanes.push({ name: branch.name, start: branch.firstCommit! });
+	}
+
+	// A local branch only gets a lane if GitHub doesn't have one by that
+	// name. Pushed branches are already on the map from GitHub's side.
+	const onGitHub = new Set([network.main, ...network.branches.map((branch) => branch.name)]);
+	for (const branch of (local?.branches ?? []).filter((branch) => !onGitHub.has(branch.name) && isOpen(branch))) {
+		lanes.push({ name: branch.name, start: branch.firstCommit!, local: true });
+	}
+
+	// The uncommitted mark goes on whichever lane is the checked out branch.
+	// If that's main, there's no lane for it, and draw.ts marks main instead.
+	if (local?.dirty) {
+		for (const lane of lanes) if (lane.name === local.current) lane.dirty = true;
 	}
 	return lanes;
+}
+
+// --- Reading git on my Mac ---
+// git.ts runs the commands. These turn what they print into data, so they
+// can be tested without a repo.
+
+// `git for-each-ref --format="%(refname)%09%(objectname)" refs/heads refs/remotes/origin`
+// prints one ref per line: its full name, a tab, and the commit it's on.
+// heads are my local branches. origin is what my Mac last heard GitHub
+// has, which can be out of date, so lanesFrom never trusts it for "is it on
+// GitHub". It's only here so main can be compared against origin's main.
+export function parseRefs(text: string): { heads: Map<string, string>; origin: Set<string> } {
+	const heads = new Map<string, string>();
+	const origin = new Set<string>();
+	for (const line of text.split("\n")) {
+		const [ref, oid] = line.split("\t");
+		if (!ref || !oid) continue;
+		if (ref.startsWith("refs/heads/")) heads.set(ref.slice("refs/heads/".length), oid);
+		else if (ref.startsWith("refs/remotes/origin/")) origin.add(ref.slice("refs/remotes/origin/".length));
+	}
+	return { heads, origin };
+}
+
+// `git log --format=%aI <branch> --not <main>` prints the date of every
+// commit the branch has that main doesn't, newest first, one per line. So
+// the count is how far ahead it is, and the last line is where it started.
+//
+// git writes the date in my time zone ("14:30:11-05:00") and GitHub writes
+// it in UTC ("19:30:11Z"). layout sorts dates as plain text, so they have to
+// match or a local branch lands in the wrong spot. This turns git's into
+// GitHub's.
+export function parseAhead(text: string): { ahead: number; firstCommit?: string } {
+	const dates = text.split("\n").filter((line) => line.trim());
+	const oldest = dates.at(-1);
+	const firstCommit = oldest ? new Date(oldest).toISOString().replace(/\.\d{3}Z$/, "Z") : undefined;
+	return { ahead: dates.length, firstCommit };
+}
+
+// `git status --porcelain=v1 --branch` starts with a "## " line about the
+// branch, then one line per changed file. Porcelain is git's word for
+// "output that won't change between versions", so it's safe to read.
+//   ## local-branches...origin/local-branches [ahead 1]
+//   ## No commits yet on main
+//   ## HEAD (no branch)          <- detached, nothing checked out by name
+export function parseStatus(text: string): { current?: string; dirty: boolean } {
+	const [first = "", ...rest] = text.split("\n");
+	const dirty = rest.some((line) => line.trim());
+
+	const header = first.replace(/^## /, "");
+	if (header.startsWith("HEAD (no branch)")) return { dirty };
+	const current = header.replace(/^No commits yet on /, "").split("...")[0].split(" ")[0];
+	return { current: current || undefined, dirty };
 }
 
 // A lane with a spot on the strip, in pixels. from is where it leaves
@@ -42,6 +122,8 @@ export type Placed = {
 	open: boolean;
 	merged?: string; // when it merged, for the line along the bottom
 	pr?: number;
+	local?: boolean;
+	dirty?: boolean;
 	color: string;
 };
 
@@ -126,6 +208,8 @@ export function layout(lanes: Lane[], width: number): Placed[] {
 			open: !lane.end,
 			merged: lane.end,
 			pr: lane.pr,
+			local: lane.local,
+			dirty: lane.dirty,
 			color: COLORS[i % COLORS.length],
 		};
 	});
@@ -171,7 +255,9 @@ function events(lanes: Lane[]): Map<Lane, [number, number]> {
 // request, since the branch itself is often deleted after merging. An open
 // one goes to the branch. Each part of a name like "feature/login" is made
 // safe for a link on its own, so the "/" between them stays a "/".
-export function laneLink(repoUrl: string, lane: Placed): string {
+// A branch that's only on my Mac has nothing on GitHub to open.
+export function laneLink(repoUrl: string, lane: Placed): string | undefined {
+	if (lane.local) return undefined;
 	if (lane.pr) return `${repoUrl}/pull/${lane.pr}`;
 	return `${repoUrl}/tree/${lane.name.split("/").map(encodeURIComponent).join("/")}`;
 }

@@ -11,9 +11,10 @@ import streamDeck, {
 	type WillDisappearEvent,
 } from "@elgato/streamdeck";
 
-import { laneLink, lanesFrom, layout, parseRepo, pick, type Placed } from "../branches";
+import { laneLink, lanesFrom, layout, type Local, parseRepo, pick, type Placed } from "../branches";
 import { type GlobalSettings, store } from "../data";
 import { drawBranches } from "../draw";
+import { readLocal } from "../git";
 import { fetchLogin, fetchNetwork, fetchRepos, type Network } from "../github";
 
 // The repo is the one thing each dial remembers: one of mine, picked from
@@ -27,6 +28,7 @@ type Settings = {
 // the last good map stays up when the wifi drops for a minute.
 type Repo = {
 	network?: Network;
+	local?: Local; // from git on my Mac, when the repo is in ~/Projects
 	message?: string;
 	busy: boolean;
 	updating: boolean;
@@ -154,12 +156,18 @@ export class BranchNetwork extends SingletonAction<Settings> {
 	}
 
 	// Tapping any of the map's dials opens the picked lane on GitHub: its
-	// pull request if it merged, or the branch if it's still open.
+	// pull request if it merged, or the branch if it's still open. A branch
+	// that's only on my Mac isn't on GitHub, so the dial shows its little
+	// warning sign instead of opening a page that doesn't exist.
 	override async onTouchTap(ev: TouchTapEvent<Settings>): Promise<void> {
 		const map = this.mapFor(ev.action);
 		const lane = map?.lanes[map.picked];
 		const network = map && this.repos.get(map.text)?.network;
-		if (lane && network) await streamDeck.system.openUrl(laneLink(network.url, lane));
+		if (!lane || !network) return;
+
+		const link = laneLink(network.url, lane);
+		if (link) await streamDeck.system.openUrl(link);
+		else await ev.action.showAlert();
 	}
 
 	private setRepo(id: string, typed: string | undefined): void {
@@ -215,6 +223,11 @@ export class BranchNetwork extends SingletonAction<Settings> {
 		const result = await fetchNetwork(token, owner, parsed.name);
 		if (!result.ok) return this.failed(text, repo, result.message, result.detail);
 
+		// A repo picked from the dropdown is one of mine, so it might be in
+		// ~/Projects too. One typed as "someone/their-repo" isn't, even if a
+		// folder happens to have the same name.
+		repo.local = parsed.owner ? undefined : await readLocal(parsed.name, result.data.main);
+
 		repo.busy = false;
 		repo.network = result.data;
 		repo.message = undefined;
@@ -255,7 +268,7 @@ export class BranchNetwork extends SingletonAction<Settings> {
 		const network = spot && this.repos.get(spot.text)?.network;
 		if (!spot || !network) return undefined;
 
-		const lanes = layout(lanesFrom(network), spot.width);
+		const lanes = layout(lanesFrom(network, this.repos.get(spot.text)?.local), spot.width);
 		return { text: spot.text, lanes, picked: pick(lanes, this.picks.get(spot.text)) };
 	}
 
@@ -277,10 +290,15 @@ export class BranchNetwork extends SingletonAction<Settings> {
 		else if (!map) message = repo?.message ?? "Loading...";
 		else if (map.lanes.length === 0) message = "No branches yet";
 
+		// main has no lane of its own, so when it's the branch checked out
+		// with uncommitted changes, its "*" goes on its label up top.
+		const main = repo?.network?.main ?? "";
+		const mainDirty = repo?.local?.dirty && repo.local.current === main;
+
 		const picture =
 			message || !map
 				? drawBranches([], "", width, slot, -1, message)
-				: drawBranches(map.lanes, repo!.network!.main, width, slot, map.picked);
+				: drawBranches(map.lanes, mainDirty ? `${main}*` : main, width, slot, map.picked);
 
 		// The key (graph) matches the item name in layouts/graph.json.
 		await dial.setFeedback({ graph: picture });
