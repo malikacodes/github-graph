@@ -189,11 +189,52 @@ test("fetchAlerts: Dependabot turned off is off, not zero and not an error", asy
 	});
 });
 
+// Pretends to be GitHub with a different answer per address: the first
+// rule whose words are in the address wins.
+async function withAnswers(rules: [string, number, unknown][], run: () => Promise<void>): Promise<void> {
+	const real = globalThis.fetch;
+	globalThis.fetch = (async (url: string) => {
+		const [, status, body] = rules.find(([words]) => String(url).includes(words)) ?? ["", 404, {}];
+		return new Response(status === 204 ? null : JSON.stringify(body), { status });
+	}) as typeof fetch;
+	try {
+		await run();
+	} finally {
+		globalThis.fetch = real;
+	}
+}
+
 // Protects a repo with no releases: GitHub's 404 there means "none yet",
-// which the key shows calmly, not as "Repo not found".
-test("fetchRelease: no releases is an answer, not an error", async () => {
-	await withGitHub(404, { message: "Not Found" }, async () => {
+// which the key shows calmly...
+test("fetchRelease: a repo with no releases says none", async () => {
+	await withAnswers([["releases/latest", 404, { message: "Not Found" }], ["/repos/me/repo", 200, { name: "repo" }]], async () => {
 		assert.deepStrictEqual(await fetchRelease("t", "me", "repo", false), { ok: true, data: undefined });
+	});
+});
+
+// ...but a misspelled repo, or a private one the token can't see, also
+// 404s there, and that must say so instead of a fake "none".
+test("fetchRelease: a repo that isn't there says so", async () => {
+	await withAnswers([], async () => {
+		const result = await fetchRelease("t", "me", "nope", false);
+		assert.ok(!result.ok && result.short === "No repo");
+	});
+});
+
+// Protects an empty repo: GitHub answers its weekly commits with 204 and
+// no body, which used to throw and leave the key stuck on loading.
+test("fetchCommitWeeks: an empty repo is eight empty weeks", async () => {
+	await withAnswers([["commit_activity", 204, null]], async () => {
+		assert.deepStrictEqual(await fetchCommitWeeks("t", "me", "repo", async () => {}), { ok: true, data: [0, 0, 0, 0, 0, 0, 0, 0] });
+	});
+});
+
+// Protects the Security count from stopping at GitHub's 100 per page.
+test("fetchAlerts: counts past the first 100", async () => {
+	const alert = { security_advisory: { severity: "low" } };
+	await withAnswers([["&page=1", 200, Array(100).fill(alert)], ["&page=2", 200, Array(30).fill(alert)]], async () => {
+		const result = await fetchAlerts("t", "me", "repo");
+		assert.ok(result.ok && result.data.low === 130);
 	});
 });
 

@@ -8,12 +8,13 @@ GitHub's dark gray. So I'm making my own versions, keys only, and every
 one of them has to explain itself, because half the point is learning what
 all these GitHub words mean.
 
-This first batch is the groundwork plus three keys: Repo, Pull Requests,
+This first batch is the groundwork plus four keys: Repo, Pull Requests,
 Issues and Workflow.
 
-## Reading his first
+## Reading the old plugin first
 
-Before drawing anything I read through how his keys actually work. A few
+Before drawing anything I read through how Pedro Fuentes Schuster's keys
+in GitHub Utilities actually work. A few
 things I decided not to copy:
 
 - When a request fails, his PR and issue keys show **0**. A dead token
@@ -48,7 +49,7 @@ Because I'd be stepping through repos and keep getting thrown into the
 browser. It's the one key where a press means "next".
 
 The repo picker in the settings has a search box and a small drawn lock on
-private repos. His uses a lock emoji. A normal dropdown can only hold text,
+private repos. His picker uses a lock emoji. A normal dropdown can only hold text,
 so mine is built by hand to fit a real drawing.
 
 ## The settings pages teach

@@ -7,7 +7,8 @@ import streamDeck, {
 	type WillAppearEvent,
 } from "@elgato/streamdeck";
 
-import { focus, isPrivate, onFocus, repoList, setFocus } from "../focus";
+import type { GlobalSettings } from "../data";
+import { focus, forget, isPrivate, onFocus, repoList, setFocus } from "../focus";
 import { COLORS, drawGithubKey } from "../key-art";
 import { repoLesson } from "../learn";
 import { stepRepo } from "../picking";
@@ -26,9 +27,29 @@ export class RepoKey extends SingletonAction<KeySettings> {
 	// missing token says so instead of "loading" forever.
 	private problem?: string;
 
+	private lastToken?: string;
+	private settled?: NodeJS.Timeout;
+
 	constructor() {
 		super();
 		onFocus(() => void this.saveAndShow());
+
+		// A new token can see repos the old one couldn't (or any at all, the
+		// first time), so the list is asked for again. Same one second wait
+		// as everywhere else, since the token box saves while I paste.
+		streamDeck.settings.onDidReceiveGlobalSettings<GlobalSettings>((ev) => {
+			const now = ev.settings.token ?? "";
+			const first = this.lastToken === undefined;
+			if (now === this.lastToken) return;
+			this.lastToken = now;
+			if (first) return;
+
+			clearTimeout(this.settled);
+			this.settled = setTimeout(() => {
+				forget();
+				void this.load();
+			}, 1000);
+		});
 	}
 
 	override async onWillAppear(ev: WillAppearEvent<KeySettings>): Promise<void> {
@@ -38,7 +59,11 @@ export class RepoKey extends SingletonAction<KeySettings> {
 		// saved pick. With nothing saved, it's the repo I pushed to last.
 		if (!focus.repo && ev.payload.settings.repo) setFocus(ev.payload.settings.repo);
 		await this.show(ev.action);
+		await this.load();
+	}
 
+	// Gets the repo list, and picks the newest repo if nothing is picked yet.
+	private async load(): Promise<void> {
 		const list = await repoList();
 		this.problem = list.ok ? undefined : list.short;
 		if (!focus.repo && list.ok && list.data[0]) setFocus(list.data[0].name);

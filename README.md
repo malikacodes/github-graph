@@ -19,7 +19,7 @@ and only says something when it can't reach GitHub.
 | 🔢 Contribution Stats | My total for the year, and how fresh the number is | A key |
 | 🎯 Daily Goal | A ring that fills toward my target for today | A key |
 | 🔥 Streak Counter | A fire that grows the longer my streak goes | A key |
-| 🗂️ GitHub keys | One repo at a time: pull requests, issues, workflow runs, stats, commits, branches, releases and security, plus a project board, with a Repo key to switch between repos | Keys, on my XL |
+| 🗂️ GitHub keys | One repo at a time: pull requests, issues, workflow runs, stats, commits, branches, releases and security, plus a project board, with a Repo key to switch between repos | Keys, on my XL and my + |
 
 The contribution ones share one download. GitHub gets asked once, no matter how many of
 them are on screen. Pressing any of them refreshes, and each one shows it
@@ -266,9 +266,11 @@ The plugin needs a GitHub token to ask for your contributions.
 
 The Branch Map and the GitHub keys read repos, and `read:user` only covers
 public ones. A private repo is missing from the picker (or shows `Repo not
-found`, if it was picked before) until the token is allowed to read it.
-That's what `repo` is for. It also allows writing, which these keys never
-do, so the token only lives in the Stream Deck app.
+found`, if it was picked before) until the token is allowed to read it,
+which is what `repo` is for. Security needs `repo` even on public repos,
+since Dependabot alerts aren't public, and Projects needs `read:project`.
+`repo` also allows writing, and these keys only ever read, so I keep the
+token in the Stream Deck app and nowhere else.
 
 Every action shares the same token and the same **Refresh Every** setting,
 which starts at 30 minutes. It also refreshes just after midnight, and a
@@ -358,7 +360,7 @@ something like `Up to date. Last checked 2:41 PM.`
   merged pull requests and the first 30 branches.
 - Tests cover the streak math, the Branch Map's sorting and layout, and
   the GitHub keys' drawing, repo picking and settings page sentences
-  (`npm test`, 67 of them). The rest of the drawing I checked by hand on
+  (`npm test`, 70 of them). The rest of the drawing I checked by hand on
   the actual device.
 - A year with 54 week columns (2028 is the next one) gets slightly smaller
   squares on the full-width graph. I can't see that one for real until then.

@@ -56,6 +56,13 @@ export async function repoList(): Promise<Result<RepoListing[]>> {
 	return result;
 }
 
+// A new token can belong to someone else, or see repos the old one
+// couldn't, so the username and the repo list are asked for again.
+export function forget(): void {
+	login = "";
+	listing = undefined;
+}
+
 // Whether a repo is private, if the list knows it.
 export function isPrivate(name: string): boolean {
 	return focus.repos.find((repo) => repo.name === name)?.private ?? false;
