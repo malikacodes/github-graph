@@ -1,4 +1,4 @@
-import type { Comparison, Counts, Run, Stats } from "./github";
+import type { Alerts, Board, Comparison, Counts, Release, Run, Stats } from "./github";
 import { ago, count } from "./picking.ts";
 
 // What each GitHub key's settings page says, row by row, in the same shape
@@ -234,5 +234,82 @@ export function compareLesson(repo: string | undefined, view: CompareView | unde
 		],
 		tryThis: "Make a branch, commit twice and push. With blank settings the key shows \"2 ahead\".",
 		press: "Opens GitHub's compare page for the two branches.",
+	};
+}
+
+export function releaseLesson(repo: string | undefined, release: Release | null | undefined, message: string | undefined, now: number): Lesson {
+	let right = waiting(repo, message);
+	if (!right && release === null) right = `${repo} hasn't had a release yet.`;
+	if (!right && release) {
+		right = `${repo} is on ${release.tag}${release.pre ? ", a pre-release" : ""}, released ${ago(release.at, now)}.`;
+	}
+	return {
+		thisIs: "The newest release of the repo: a version I've wrapped up and labelled for people to download.",
+		now: right ?? "Checking...",
+		normal: [
+			"Most of my repos have no releases, and that's fine for things only I use",
+			"An app other people install gets one each time I ship a version",
+			"Pre-releases are left out unless they're turned on below",
+		],
+		words: [
+			["Release", "a version of the project with notes and downloads, made from a tag"],
+			["Tag", "a name pinned to one commit, like v1.1, so that exact version can always be found"],
+			["Semantic version", "the three numbers in v2.4.1: big change, new feature, small fix"],
+			["Pre-release", "a version that's out for testing, not finished yet"],
+		],
+		tryThis: "On GitHub, open Releases on a practice repo, make a tag called v0.1.0 and publish it. The key picks it up on the next refresh.",
+		press: "Opens the release on GitHub, or the repo's Releases page if there's none.",
+	};
+}
+
+// "1 critical", "2 high and 1 low": the worst ones first.
+export function alertWords(alerts: Alerts): string {
+	const parts = (["critical", "high", "medium", "low"] as const).filter((level) => alerts[level] > 0).map((level) => `${alerts[level]} ${level}`);
+	return parts.length ? parts.join(" and ") : "no open alerts";
+}
+
+export function alertsLesson(repo: string | undefined, alerts: Alerts | undefined, message: string | undefined): Lesson {
+	let right = waiting(repo, message);
+	if (!right && alerts?.off) right = `Dependabot is off for ${repo}, so nothing is checking its packages. Off isn't the same as safe.`;
+	else if (!right && alerts) right = `${repo} has ${alertWords(alerts)}.`;
+	return {
+		thisIs: "Dependabot's security alerts for the repo: known problems in the packages my code uses.",
+		now: right ?? "Checking...",
+		normal: [
+			"Off on a new repo until I turn it on in the repo's settings",
+			"0 most of the time once it's on",
+			"A new alert usually means updating one package to a newer version",
+		],
+		words: [
+			["Dependabot", "GitHub's helper that watches the packages my project uses for known problems"],
+			["Dependency", "a package my code needs, like one from npm or pip"],
+			["Severity", "how bad a problem is: low, medium, high or critical"],
+			["Advisory", "the public write-up of a problem, with which versions are affected"],
+		],
+		tryThis: "On a repo, open Settings, then Code security, and turn on Dependabot alerts. The key changes from off to a number.",
+		press: "Opens the repo's Dependabot alerts, or the settings page to turn it on when it's off.",
+	};
+}
+
+export function boardLesson(board: Board | null | undefined, message: string | undefined): Lesson {
+	let right = message ? `Couldn't check my projects: ${message}.` : undefined;
+	if (!right && board === null) right = "I don't have an open project board yet.";
+	if (!right && board) right = `${board.title}: ${board.todo} to do, ${board.doing} in progress, ${board.done} done.`;
+	return {
+		thisIs: "One of my GitHub project boards, counted into to do, doing and done by each item's Status. It doesn't follow the Repo key, since a board can hold work from many repos.",
+		now: right ?? "Checking...",
+		normal: [
+			"Done grows, to do comes and goes",
+			"More than two or three in progress at once usually means something's stuck",
+			"Items with no status count as to do",
+		],
+		words: [
+			["Project", "a board on GitHub for planning work, a bit like a to-do list with columns"],
+			["Item", "one card on the board: an issue, a pull request, or a plain note"],
+			["Status", "the column an item is in, like Todo, In Progress or Done"],
+			["Draft item", "a card that's just a note, not linked to an issue yet"],
+		],
+		tryThis: "Add a draft item to the board and drag it to In Progress. The middle number goes up on the next refresh.",
+		press: "Opens the project board on GitHub.",
 	};
 }

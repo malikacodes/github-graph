@@ -19,7 +19,7 @@ and only says something when it can't reach GitHub.
 | 🔢 Contribution Stats | My total for the year, and how fresh the number is | A key |
 | 🎯 Daily Goal | A ring that fills toward my target for today | A key |
 | 🔥 Streak Counter | A fire that grows the longer my streak goes | A key |
-| 🗂️ GitHub keys | One repo at a time: pull requests, issues, workflow runs, stats, commits and branches, with a Repo key to switch between repos | Keys, on my XL |
+| 🗂️ GitHub keys | One repo at a time: pull requests, issues, workflow runs, stats, commits, branches, releases and security, plus a project board, with a Repo key to switch between repos | Keys, on my XL |
 
 The contribution ones share one download. GitHub gets asked once, no matter how many of
 them are on screen. Pressing any of them refreshes, and each one shows it
@@ -195,11 +195,20 @@ under it, and a few gray words at the bottom, on plain black.
 | Repo Stats | Stars, forks, watchers or the main language, picked under **Show** | Opens that page on GitHub |
 | Commit Activity | A bar for each of the last eight weeks of commits on main | Opens the commit history |
 | Branch Comparison | How far one branch is ahead of or behind another | Opens GitHub's compare page |
+| Releases | The newest release and how long ago it came out | Opens the release |
+| Security | Open Dependabot alerts, colored by the worst one, or **off** when Dependabot isn't turned on | Opens the alerts, or the setting to turn them on |
+| Projects | One of my project boards: to do, doing and done | Opens the board |
 
 Every key starts on **Follow the Repo key**, so pressing the Repo key
 switches all of them together. Picking a repo in a key's settings pins
 that one key to it instead. The picker has a search box, lists my repos
 newest push first, and marks private ones with a small lock.
+
+Security says **off** instead of a number when Dependabot isn't turned on
+for the repo. Zero would look like good news when really nothing is
+checking. Projects is the one key that doesn't follow the Repo key: a board
+belongs to me, not to a repo, so its settings pick a board instead (the
+newest one, if nothing's picked). It needs `read:project` on the token.
 
 Branch Comparison works with nothing set: it compares the newest branch
 with main, on whatever repo the Repo key is on. Its **Base** and
@@ -334,7 +343,7 @@ something like `Up to date. Last checked 2:41 PM.`
   merged pull requests and the first 30 branches.
 - Tests cover the streak math, the Branch Map's sorting and layout, and
   the GitHub keys' drawing, repo picking and settings page sentences
-  (`npm test`, 62 of them). The rest of the drawing I checked by hand on
+  (`npm test`, 67 of them). The rest of the drawing I checked by hand on
   the actual device.
 - A year with 54 week columns (2028 is the next one) gets slightly smaller
   squares on the full-width graph. I can't see that one for real until then.

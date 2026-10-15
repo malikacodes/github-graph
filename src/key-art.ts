@@ -143,3 +143,12 @@ export function weekBars(weeks: number[], color: string): string {
 	});
 	return bars;
 }
+
+// The middle of the Projects key: three numbers side by side, to do in
+// gray, doing in yellow and done in green, with a tiny word under each.
+export function boardPiles(todo: number, doing: number, done: number): string {
+	const pile = (x: number, n: number, color: string, word: string) =>
+		`<text x="${x}" y="88" font-size="26" font-weight="700" fill="${color}" text-anchor="middle" ${FONT}>${n}</text>` +
+		`<text x="${x}" y="104" font-size="11" fill="${COLORS.gray}" text-anchor="middle" ${FONT}>${word}</text>`;
+	return pile(30, todo, WHITE, "to do") + pile(72, doing, COLORS.yellow, "doing") + pile(114, done, COLORS.green, "done");
+}

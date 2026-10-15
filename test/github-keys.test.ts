@@ -1,9 +1,9 @@
 import assert from "node:assert";
 import { test } from "node:test";
 
-import { fetchCommitWeeks } from "../src/github.ts";
+import { fetchAlerts, fetchCommitWeeks, fetchRelease, pile } from "../src/github.ts";
 import { drawGithubKey, weekBars } from "../src/key-art.ts";
-import { compareLesson, issueLesson, pullLesson, runLesson, statOf } from "../src/learn.ts";
+import { alertsLesson, alertWords, compareLesson, issueLesson, pullLesson, releaseLesson, runLesson, statOf } from "../src/learn.ts";
 import { ago, pickBranches, stepRepo, whichRepo } from "../src/picking.ts";
 
 const NOW = Date.parse("2026-10-15T12:00:00Z");
@@ -161,4 +161,60 @@ test("fetchCommitWeeks: waits out a 202, then keeps the last eight weeks", async
 	} finally {
 		globalThis.fetch = real;
 	}
+});
+
+// Pretends to be GitHub for the length of one test: every request gets the
+// same status and body back.
+async function withGitHub(status: number, body: unknown, run: () => Promise<void>): Promise<void> {
+	const real = globalThis.fetch;
+	globalThis.fetch = (async () => new Response(JSON.stringify(body), { status })) as typeof fetch;
+	try {
+		await run();
+	} finally {
+		globalThis.fetch = real;
+	}
+}
+
+// Protects the difference between "safe" and "nobody's checking": GitHub
+// answers 403 with "disabled" when Dependabot is off, and that must not
+// come out as 0 alerts or as a token problem.
+test("fetchAlerts: Dependabot turned off is off, not zero and not an error", async () => {
+	await withGitHub(403, { message: "Dependabot alerts are disabled for this repository." }, async () => {
+		const result = await fetchAlerts("t", "me", "repo");
+		assert.ok(result.ok && result.data.off);
+	});
+	await withGitHub(403, { message: "Resource not accessible by personal access token" }, async () => {
+		const result = await fetchAlerts("t", "me", "repo");
+		assert.ok(!result.ok && result.short === "No access");
+	});
+});
+
+// Protects a repo with no releases: GitHub's 404 there means "none yet",
+// which the key shows calmly, not as "Repo not found".
+test("fetchRelease: no releases is an answer, not an error", async () => {
+	await withGitHub(404, { message: "Not Found" }, async () => {
+		assert.deepStrictEqual(await fetchRelease("t", "me", "repo", false), { ok: true, data: undefined });
+	});
+});
+
+// Protects the board piles: boards name their columns differently, and an
+// item with no status is still work to do.
+test("pile: sorts statuses by their words, no status is to do", () => {
+	assert.deepStrictEqual(pile(["Todo", "In Progress", "Done", undefined, "In review", "Backlog", "Shipped"]), { todo: 3, doing: 2, done: 2 });
+});
+
+// Protects the security sentences, worst first.
+test("alerts: words go worst first, and off says off", () => {
+	assert.strictEqual(alertWords({ off: false, critical: 0, high: 2, medium: 0, low: 1 }), "2 high and 1 low");
+	assert.strictEqual(
+		alertsLesson("leak-flow", { off: true, critical: 0, high: 0, medium: 0, low: 0 }, undefined).now,
+		"Dependabot is off for leak-flow, so nothing is checking its packages. Off isn't the same as safe.",
+	);
+});
+
+// Protects the release sentences for none and for a pre-release.
+test("releaseLesson: none yet, and a pre-release says so", () => {
+	assert.strictEqual(releaseLesson("karaoke-maker", null, undefined, NOW).now, "karaoke-maker hasn't had a release yet.");
+	const pre = { tag: "v2.0.0-beta", name: "", at: "2026-10-13T12:00:00Z", pre: true, url: "" };
+	assert.strictEqual(releaseLesson("leak-flow", pre, undefined, NOW).now, "leak-flow is on v2.0.0-beta, a pre-release, released 2 days ago.");
 });
