@@ -1,5 +1,6 @@
 import streamDeck from "@elgato/streamdeck";
 
+import { BranchNetwork } from "./actions/branch-network";
 import { ContributionGraph } from "./actions/contribution-graph";
 import { ContributionStats } from "./actions/contribution-stats";
 import { DailyGoal } from "./actions/daily-goal";
@@ -16,6 +17,7 @@ streamDeck.actions.registerAction(new WideGraph());
 streamDeck.actions.registerAction(new ContributionStats());
 streamDeck.actions.registerAction(new DailyGoal());
 streamDeck.actions.registerAction(new StreakCounter());
+streamDeck.actions.registerAction(new BranchNetwork());
 
 // connect() has to come last, after the actions are registered.
 streamDeck.connect();

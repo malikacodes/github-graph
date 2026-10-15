@@ -50,6 +50,29 @@
 			]
 		},
 		{
+			"Name": "Branch Map",
+			"UUID": "com.malikacodes.github-graph.branches",
+			"Icon": "imgs/actions/branches/icon",
+			"Tooltip": "A repo's branches as a metro map: merged pull requests loop back into main, branches still open run off the end. Turn to pick a branch and read its name, tap to open it on GitHub. Put it on two or more dials set to the same repo to spread it out.",
+			"PropertyInspectorPath": "ui/branches.html",
+			"Controllers": [
+				"Encoder"
+			],
+			"Encoder": {
+				"layout": "layouts/graph.json",
+				"TriggerDescription": {
+					"Rotate": "Pick a branch",
+					"Push": "Refresh",
+					"Touch": "Open the picked branch on GitHub"
+				}
+			},
+			"States": [
+				{
+					"Image": "imgs/actions/dial"
+				}
+			]
+		},
+		{
 			"Name": "Contribution Stats",
 			"UUID": "com.malikacodes.github-graph.stats",
 			"Icon": "imgs/actions/stats/icon",
@@ -107,7 +130,7 @@
 	"Category": "GitHub Graph",
 	"CategoryIcon": "imgs/plugin/category-icon",
 	"CodePath": "bin/plugin.js",
-	"Description": "Shows my GitHub contributions on a Stream Deck: graphs on the dials, and stats, a daily goal and a streak on the keys.",
+	"Description": "Shows my GitHub contributions on a Stream Deck: graphs on the dials, a map of a repo's branches, and stats, a daily goal and a streak on the keys.",
 	"Icon": "imgs/plugin/marketplace",
 	"SDKVersion": 3,
 	"Software": {

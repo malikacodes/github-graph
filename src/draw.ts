@@ -1,3 +1,4 @@
+import type { Placed } from "./branches";
 import type { Day } from "./github";
 
 // GitHub's dark theme greens. The empty color is a touch lighter than
@@ -119,6 +120,131 @@ export function drawWide(columns: Columns, days: Map<string, Day>, slot: number)
 	COLORS.forEach((color, i) => {
 		content += `<rect x="${LEGEND_LEFT + i * 10}" y="${LEGEND_TOP}" width="8" height="8" rx="2" fill="${color}"/>`;
 	});
+
+	return asImage(
+		`<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100" viewBox="${slot * 200} 0 200 100">${content}</svg>`,
+	);
+}
+
+// --- The branch dial ---
+
+// Main runs along the top, lanes hang off it in two rows, and the picked
+// lane's name runs along the bottom. Words stay out of the top right
+// corner, because a dial in a dial stack gets its stack icon drawn there.
+const MAIN_Y = 18;
+const ROW_Y = [44, 70];
+const NAME_Y = 94;
+const MAIN_COLOR = "#58a6ff";
+const QUIET = "#8b949e";
+const FONT = "Helvetica, Arial, sans-serif";
+
+// The lanes that aren't picked fade back to this much of their color.
+// That's dark color over black, not gray, so nothing turns into a gray
+// square next to the deck's own black.
+const FADED = 0.3;
+
+// A rough width for one letter at font size 1. Stream Deck draws the text
+// itself, so there's no way to measure it from here, and it draws letters
+// wider than a browser does. This is from what fit on the real strip.
+const LETTER = 0.62;
+
+// Branch names come from whoever made the branch, so anything that means
+// something in SVG gets swapped for its safe version first.
+function escape(text: string): string {
+	return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// The line along the bottom: the picked lane's name, and whether it's
+// still open or when it merged. On a narrow strip the "when" goes first,
+// then the letters get smaller, and only a really long name on one dial
+// gets cut.
+function nameLine(lane: Placed, width: number): string {
+	const when = lane.open
+		? "still open"
+		: `merged ${new Date(lane.merged!).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+	const room = width - 8;
+	const fits = (text: string, size: number) => text.length * size * LETTER <= room;
+
+	let size = 11;
+	// The "  ·  " is only for measuring how much room the line needs.
+	let extra = `  ·  ${when}`;
+	if (!fits(lane.name + extra, size)) extra = "";
+	if (!fits(lane.name, size)) size = 9;
+
+	let name = lane.name;
+	const letters = Math.floor(room / (size * LETTER));
+	if (name.length > letters) name = `${name.slice(0, letters - 1)}…`;
+
+	const text = (x: number, anchor: string, fill: string, words: string, bold = false) =>
+		`<text x="${x}" y="${NAME_Y}" text-anchor="${anchor}" font-family="${FONT}" font-size="${size}"${bold ? ` font-weight="600"` : ""} fill="${fill}">${escape(words)}</text>`;
+
+	if (!extra) return text(width / 2, "middle", lane.color, name, true);
+
+	// Three separate pieces, each placed on its own: the name ends just
+	// left of the dot and the date starts just right of it. Stream Deck
+	// ignores spaces and nudges between pieces of one text, so this is the
+	// only way the gaps stay put. Only the centering uses the letter guess.
+	const dot = width / 2 + ((name.length - when.length) * size * LETTER) / 2;
+	return (
+		text(dot - size * 0.6, "end", lane.color, name, true) +
+		text(dot, "middle", QUIET, "·") +
+		text(dot + size * 0.6, "start", QUIET, when)
+	);
+}
+
+// Same idea as drawWide: every dial draws the whole picture, width wide,
+// and shows its own 200px of it. slot is which 200px, counting from the
+// left among the dials showing this repo. picked is the lane that's bright
+// and named. message replaces the map with a few words, for loading and
+// for anything that went wrong.
+export function drawBranches(
+	lanes: Placed[],
+	main: string,
+	width: number,
+	slot: number,
+	picked: number,
+	message?: string,
+): string {
+	let content = "";
+
+	if (message) {
+		content = `<text x="${width / 2}" y="56" text-anchor="middle" font-family="${FONT}" font-size="13" fill="${QUIET}">${escape(message)}</text>`;
+	} else {
+		let faded = "";
+		let bright = "";
+
+		lanes.forEach((lane, i) => {
+			const y = ROW_Y[lane.row];
+
+			// An open lane stops just short of the right edge with a dot (see
+			// RIGHT in branches.ts), so it reads as "still going", not cut off.
+			const { from, to, slant } = lane;
+
+			// Each bend is an S: it leaves main flat, curves down, and levels
+			// off in its row. The two middle points of a "C" curve pull the
+			// line flat at both ends, which is what makes it an S and not a
+			// straight slant.
+			const down = `C${from + slant / 2},${MAIN_Y} ${from + slant / 2},${y} ${from + slant},${y}`;
+			const up = `L${to - slant},${y} C${to - slant / 2},${y} ${to - slant / 2},${MAIN_Y} ${to},${MAIN_Y}`;
+			let part = `<path d="M${from},${MAIN_Y} ${down} ${lane.open ? `L${to},${y}` : up}" fill="none" stroke="${lane.color}" stroke-width="2.5" stroke-linecap="round"/>`;
+
+			// Rings on main where the lane leaves and comes back, filled with
+			// black so main's line doesn't show through them.
+			part += `<circle cx="${from}" cy="${MAIN_Y}" r="3.5" fill="#000000" stroke="${lane.color}" stroke-width="2"/>`;
+			part += lane.open
+				? `<circle cx="${to}" cy="${y}" r="3" fill="${lane.color}"/>`
+				: `<circle cx="${to}" cy="${MAIN_Y}" r="3.5" fill="#000000" stroke="${lane.color}" stroke-width="2"/>`;
+
+			// The picked lane is drawn last so it sits on top where lanes cross.
+			if (i === picked) bright = part;
+			else faded += `<g opacity="${FADED}">${part}</g>`;
+		});
+
+		const mainLine = `<line x1="0" y1="${MAIN_Y}" x2="${width}" y2="${MAIN_Y}" stroke="${MAIN_COLOR}" stroke-width="2.5"/>`;
+		const mainName = `<text x="4" y="${MAIN_Y - 6}" font-family="${FONT}" font-size="9" fill="${MAIN_COLOR}">${escape(main)}</text>`;
+		const name = lanes[picked] ? nameLine(lanes[picked], width) : "";
+		content = faded + mainLine + bright + mainName + name;
+	}
 
 	return asImage(
 		`<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100" viewBox="${slot * 200} 0 200 100">${content}</svg>`,
