@@ -10,3 +10,4 @@ and how I fixed it.
 | 02 | 2026-10-06 | [One dial turned into five actions (a.k.a. the rabbit hole)](02-the-rabbit-hole.md) |
 | 03 | 2026-10-08 | [Less on the dial](03-less-on-the-dial.md) |
 | 04 | 2026-10-12 | [The hole on Mondays](04-the-hole-on-mondays.md) |
+| 05 | 2026-10-15 | [The branch map](05-the-branch-map.md) |
