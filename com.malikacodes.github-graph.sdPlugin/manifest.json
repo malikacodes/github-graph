@@ -305,6 +305,42 @@
 					"ShowTitle": false
 				}
 			]
+		},
+		{
+			"Name": "GitHub",
+			"UUID": "com.malikacodes.github-graph.github",
+			"Icon": "imgs/actions/github/icon",
+			"Tooltip": "Opens the GitHub page on this deck: the Repo key and every GitHub key, on the picked repo.",
+			"PropertyInspectorPath": "ui/deck-key.html",
+			"Controllers": [
+				"Keypad"
+			],
+			"UserTitleEnabled": false,
+			"SupportedInMultiActions": false,
+			"States": [
+				{
+					"Image": "imgs/actions/github/key",
+					"ShowTitle": false
+				}
+			]
+		},
+		{
+			"Name": "Go to +",
+			"UUID": "com.malikacodes.github-graph.to-plus",
+			"Icon": "imgs/actions/to-plus/icon",
+			"Tooltip": "Sends the Stream Deck + to its GitHub profile: the Branch Map on the dials and the keys I use most.",
+			"PropertyInspectorPath": "ui/deck-key.html",
+			"Controllers": [
+				"Keypad"
+			],
+			"UserTitleEnabled": false,
+			"SupportedInMultiActions": false,
+			"States": [
+				{
+					"Image": "imgs/actions/to-plus/key",
+					"ShowTitle": false
+				}
+			]
 		}
 	],
 	"Category": "GitHub Graph",
@@ -329,5 +365,21 @@
 	"Nodejs": {
 		"Version": "24"
 	},
-	"UUID": "com.malikacodes.github-graph"
+	"UUID": "com.malikacodes.github-graph",
+	"Profiles": [
+		{
+			"Name": "profiles/github-xl",
+			"DeviceType": 2,
+			"Readonly": false,
+			"DontAutoSwitchWhenInstalled": true,
+			"AutoInstall": true
+		},
+		{
+			"Name": "profiles/github-plus",
+			"DeviceType": 7,
+			"Readonly": false,
+			"DontAutoSwitchWhenInstalled": true,
+			"AutoInstall": true
+		}
+	]
 }

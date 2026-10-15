@@ -14,12 +14,16 @@ import streamDeck, {
 import { laneLink, lanesFrom, layout, type Local, parseRepo, pick, type Placed } from "../branches";
 import { type GlobalSettings, store } from "../data";
 import { drawBranches } from "../draw";
+import { focus, onFocus } from "../focus";
 import { readLocal } from "../git";
-import { fetchLogin, fetchNetwork, fetchRepos, type Network } from "../github";
+import { fetchLogin, fetchNetwork, type Network } from "../github";
+import { whichRepo } from "../picking";
+import { sendRepos } from "./github-key";
 
-// The repo is the one thing each dial remembers: one of mine, picked from
-// the dropdown, like "karaoke-maker". parseRepo still takes
-// "someone/their-repo" too, for a setting that came from anywhere else.
+// The repo is the one thing each dial remembers: one of mine, picked in
+// the repo picker, like "karaoke-maker". Blank means "follow the Repo key".
+// parseRepo still takes "someone/their-repo" too, for a setting that came
+// from anywhere else.
 type Settings = {
 	repo?: string;
 };
@@ -44,6 +48,7 @@ const DEFAULT_MINUTES = 30;
 export class BranchNetwork extends SingletonAction<Settings> {
 	// Which repo each dial is set to, by the dial's id.
 	private repoOf = new Map<string, string>();
+	private pinned = new Map<string, string>();
 
 	// The picked lane's name for each repo. Dials showing the same repo are
 	// one picture, so they share one pick, and turning any of them moves it.
@@ -62,6 +67,13 @@ export class BranchNetwork extends SingletonAction<Settings> {
 
 	constructor() {
 		super();
+
+		// A new repo on the Repo key moves every dial that follows it.
+		onFocus(async () => {
+			for (const [id, setting] of this.pinned) if (!setting) this.setRepo(id, "");
+			await this.showAll();
+			await this.refreshMissing();
+		});
 
 		// A new token or refresh time on the settings page. Same one second
 		// wait as data.ts, since the token box saves while I'm still pasting.
@@ -97,6 +109,7 @@ export class BranchNetwork extends SingletonAction<Settings> {
 	// A dial leaving changes how many share a picture, so everyone redraws.
 	override async onWillDisappear(ev: WillDisappearEvent<Settings>): Promise<void> {
 		this.repoOf.delete(ev.action.id);
+		this.pinned.delete(ev.action.id);
 		await this.showAll();
 	}
 
@@ -126,20 +139,12 @@ export class BranchNetwork extends SingletonAction<Settings> {
 	// to that isn't in the list, like a private one the token can't see,
 	// stays in it with a note. Otherwise the dropdown would go blank and
 	// look like I never picked one.
+	// The repo picker on the settings page, the same one the GitHub keys use,
+	// with "Follow the Repo key" at the top.
 	override async onSendToPlugin(ev: SendToPluginEvent<{ event?: string }, Settings>): Promise<void> {
-		if (ev.payload?.event !== "getRepos") return;
-
-		const settings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
-		const result = await fetchRepos(settings.token?.trim());
-		const names = result.ok ? result.data.map((repo) => repo.name) : [];
-		if (!result.ok) streamDeck.logger.warn(`Couldn't list repos: ${result.message}`);
-
-		const items = names.map((name) => ({ value: name, label: name }));
-		const saved = this.repoOf.get(ev.action.id);
-		if (saved && !names.includes(saved)) items.unshift({ value: saved, label: `${saved} (token can't see it)` });
-
-		await streamDeck.ui.sendToPropertyInspector({ event: "getRepos", items });
+		if (ev.payload?.event === "getRepos") await sendRepos(this.pinned.get(ev.action.id) ?? "", true);
 	}
+
 
 	// Turning steps the pick along the lanes, left to right, and wraps
 	// around at the ends, so going past the last lane lands back on the
@@ -170,8 +175,13 @@ export class BranchNetwork extends SingletonAction<Settings> {
 		else await ev.action.showAlert();
 	}
 
+	// A blank setting follows the Repo key, the same as the GitHub keys, so
+	// the dials on my + switch repos along with the XL. repoOf holds the
+	// repo each dial is really showing, and pinned holds what its setting
+	// says, so a new pick on the Repo key can move only the followers.
 	private setRepo(id: string, typed: string | undefined): void {
-		const text = typed?.trim() ?? "";
+		this.pinned.set(id, typed?.trim() ?? "");
+		const text = whichRepo(typed, focus.repo);
 		if (text) this.repoOf.set(id, text);
 		else this.repoOf.delete(id);
 		if (text && !this.repos.has(text)) this.repos.set(text, { busy: false, updating: false });
@@ -276,7 +286,7 @@ export class BranchNetwork extends SingletonAction<Settings> {
 	private async show(dial: DialAction<Settings>): Promise<void> {
 		const spot = this.spot(dial);
 		if (!spot) {
-			await dial.setFeedback({ graph: drawBranches([], "", 200, 0, -1, "Pick a repo in settings") });
+			await dial.setFeedback({ graph: drawBranches([], "", 200, 0, -1, "Pick a repo, or press the Repo key") });
 			return;
 		}
 		const { text, slot, width } = spot;

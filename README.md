@@ -198,6 +198,8 @@ under it, and a few gray words at the bottom, on plain black.
 | Releases | The newest release and how long ago it came out | Opens the release |
 | Security | Open Dependabot alerts, colored by the worst one, or **off** when Dependabot isn't turned on | Opens the alerts, or the setting to turn them on |
 | Projects | One of my project boards: to do, doing and done | Opens the board |
+| GitHub | A way in, for my Home page | Opens the GitHub page on the deck it's on |
+| Go to + | A way to the + | Opens the + GitHub page, with the Branch Map on the dials |
 
 Every key starts on **Follow the Repo key**, so pressing the Repo key
 switches all of them together. Picking a repo in a key's settings pins
@@ -209,6 +211,14 @@ for the repo. Zero would look like good news when really nothing is
 checking. Projects is the one key that doesn't follow the Repo key: a board
 belongs to me, not to a repo, so its settings pick a board instead (the
 newest one, if nothing's picked). It needs `read:project` on the token.
+
+The plugin ships two ready-made pages (Stream Deck calls them profiles).
+**GitHub XL** has the Repo key, all nine GitHub keys, Go to + and a Home
+key. **GitHub +** has the seven keys I use most, a Home key, and the
+Branch Map on all four dials. Everything on both starts on "Follow the
+Repo key", so pressing Repo on either deck moves everything, dials
+included. The first time a GitHub or Go to + key opens one, Stream Deck
+asks to install it. That only happens once per deck.
 
 Branch Comparison works with nothing set: it compares the newest branch
 with main, on whatever repo the Repo key is on. Its **Base** and
@@ -232,8 +242,13 @@ Stream Deck +.
 npm install                                               # get the SDK and build tools
 npm run build                                             # build the plugin into the .sdPlugin folder
 npx streamdeck dev                                        # turn on developer mode so Stream Deck loads local plugins
+npm run profiles                                          # make the GitHub XL and GitHub + pages (see below)
 npx streamdeck link com.malikacodes.github-graph.sdPlugin # tell Stream Deck where the plugin lives
 ```
+
+`npm run profiles` builds the two GitHub pages from my own Stream Deck
+files, so their Home keys point at my own Home profiles. That's also why
+the built pages aren't in the repo.
 
 Then in the Stream Deck app, find **GitHub Graph** in the action list and
 drag the actions where you want them. For the full-width graph, add a new
