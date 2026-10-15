@@ -125,6 +125,78 @@
 					"ShowTitle": false
 				}
 			]
+		},
+		{
+			"Name": "Repo",
+			"UUID": "com.malikacodes.github-graph.repo",
+			"Icon": "imgs/actions/repo/icon",
+			"Tooltip": "The repo every GitHub key follows. Press to step to the next repo, newest push first.",
+			"PropertyInspectorPath": "ui/repo-key.html",
+			"Controllers": [
+				"Keypad"
+			],
+			"UserTitleEnabled": false,
+			"SupportedInMultiActions": false,
+			"States": [
+				{
+					"Image": "imgs/actions/repo/key",
+					"ShowTitle": false
+				}
+			]
+		},
+		{
+			"Name": "Pull Requests",
+			"UUID": "com.malikacodes.github-graph.pulls",
+			"Icon": "imgs/actions/pulls/icon",
+			"Tooltip": "Open pull requests on the repo. Press to open them on GitHub.",
+			"PropertyInspectorPath": "ui/github-key.html",
+			"Controllers": [
+				"Keypad"
+			],
+			"UserTitleEnabled": false,
+			"SupportedInMultiActions": false,
+			"States": [
+				{
+					"Image": "imgs/actions/pulls/key",
+					"ShowTitle": false
+				}
+			]
+		},
+		{
+			"Name": "Issues",
+			"UUID": "com.malikacodes.github-graph.issues",
+			"Icon": "imgs/actions/issues/icon",
+			"Tooltip": "Open issues on the repo. Press to open them on GitHub.",
+			"PropertyInspectorPath": "ui/github-key.html",
+			"Controllers": [
+				"Keypad"
+			],
+			"UserTitleEnabled": false,
+			"SupportedInMultiActions": false,
+			"States": [
+				{
+					"Image": "imgs/actions/issues/key",
+					"ShowTitle": false
+				}
+			]
+		},
+		{
+			"Name": "Workflow",
+			"UUID": "com.malikacodes.github-graph.workflow",
+			"Icon": "imgs/actions/workflow/icon",
+			"Tooltip": "The latest GitHub Actions run on the repo. Press to open it on GitHub.",
+			"PropertyInspectorPath": "ui/github-key.html",
+			"Controllers": [
+				"Keypad"
+			],
+			"UserTitleEnabled": false,
+			"SupportedInMultiActions": false,
+			"States": [
+				{
+					"Image": "imgs/actions/workflow/key",
+					"ShowTitle": false
+				}
+			]
 		}
 	],
 	"Category": "GitHub Graph",

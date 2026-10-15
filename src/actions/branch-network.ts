@@ -131,7 +131,7 @@ export class BranchNetwork extends SingletonAction<Settings> {
 
 		const settings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
 		const result = await fetchRepos(settings.token?.trim());
-		const names = result.ok ? result.data : [];
+		const names = result.ok ? result.data.map((repo) => repo.name) : [];
 		if (!result.ok) streamDeck.logger.warn(`Couldn't list repos: ${result.message}`);
 
 		const items = names.map((name) => ({ value: name, label: name }));

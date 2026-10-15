@@ -9,7 +9,7 @@ and only says something when it can't reach GitHub.
 
 ![The full-width graph across all four dials](screenshots/full-width-graph.png)
 
-## The six actions
+## The actions
 
 | Action | What it does | Where it goes |
 |---|---|---|
@@ -19,6 +19,7 @@ and only says something when it can't reach GitHub.
 | 🔢 Contribution Stats | My total for the year, and how fresh the number is | A key |
 | 🎯 Daily Goal | A ring that fills toward my target for today | A key |
 | 🔥 Streak Counter | A fire that grows the longer my streak goes | A key |
+| 🗂️ GitHub keys | One repo's pull requests, issues and workflow runs, with a Repo key to switch between repos | Keys, on my XL |
 
 The contribution ones share one download. GitHub gets asked once, no matter how many of
 them are on screen. Pressing any of them refreshes, and each one shows it
@@ -179,6 +180,33 @@ npm run preview   # builds preview/tiers.html, a page with all eight fires movin
 
 Then open `preview/tiers.html` in a browser.
 
+### 🗂️ GitHub keys
+
+A set of keys about one repo at a time, made to help me learn GitHub as I
+use it. Each one is a small drawing in its own color, a number or word
+under it, and a few gray words at the bottom, on plain black.
+
+| Key | What it shows | A press |
+|---|---|---|
+| Repo | The repo the other keys follow, with a small lock if it's private | Steps to the next repo, newest push first, and round again |
+| Pull Requests | How many are open | Opens them on GitHub |
+| Issues | How many are open (or how many are closed, when none are open) | Opens them on GitHub |
+| Workflow | The latest GitHub Actions run: passed, failed or running | Opens that run on GitHub |
+
+Every key starts on **Follow the Repo key**, so pressing the Repo key
+switches all of them together. Picking a repo in a key's settings pins
+that one key to it instead. The picker has a search box, lists my repos
+newest push first, and marks private ones with a small lock.
+
+Each key's settings page explains itself, the same way my Mac Vitals keys
+do: **This is**, **Right now** (filled in live from the key), **Normal**,
+**Words to know**, **Try this** and **A press**.
+
+They refresh on their own with **Refresh Every**, a few seconds apart so
+they don't all ask GitHub at once. When something's off, the drawing goes
+gray and the bottom words turn soft red and say why. When a refresh fails
+after a good one, the last good number stays up.
+
 ## Setting it up
 
 You need Node.js 24 or newer, the Stream Deck app 7.1 or newer, and a
@@ -200,17 +228,16 @@ page and drag **Full-Width Graph** onto all four dials.
 The plugin needs a GitHub token to ask for your contributions.
 
 1. Go to <https://github.com/settings/tokens/new> (a classic token).
-2. Tick only `read:user`. Nothing else.
+2. Tick `read:user` for the contribution graphs. For private repos on the
+   Branch Map and the GitHub keys, also tick `repo` and `read:project`.
 3. Generate it, copy it, and paste it into the **GitHub Token** field in
    any action's settings in the Stream Deck app.
 
-The Branch Map reads repos, and `read:user` only covers public ones. A
-private repo is missing from the dropdown (or shows `Repo not found`, if it
-was picked before) until the token is allowed to read it.
-A classic token would need the `repo` box ticked, which also allows
-writing, so for private repos I'd make a fine-grained token instead, with
-read-only **Contents** and **Pull requests** on just the repos I want on
-the dial.
+The Branch Map and the GitHub keys read repos, and `read:user` only covers
+public ones. A private repo is missing from the picker (or shows `Repo not
+found`, if it was picked before) until the token is allowed to read it.
+That's what `repo` is for. It also allows writing, which these keys never
+do, so the token only lives in the Stream Deck app.
 
 Every action shares the same token and the same **Refresh Every** setting,
 which starts at 30 minutes. It also refreshes just after midnight, and a
@@ -298,8 +325,9 @@ something like `Up to date. Last checked 2:41 PM.`
 - The Branch Map only knows what's on GitHub. A branch that's only on my
   Mac, or changes I haven't committed, don't show. It looks at the last 20
   merged pull requests and the first 30 branches.
-- Tests cover the streak math and the Branch Map's sorting and layout
-  (`npm test`, 32 of them). The rest of the drawing I checked by hand on
+- Tests cover the streak math, the Branch Map's sorting and layout, and
+  the GitHub keys' drawing, repo picking and settings page sentences
+  (`npm test`, 57 of them). The rest of the drawing I checked by hand on
   the actual device.
 - A year with 54 week columns (2028 is the next one) gets slightly smaller
   squares on the full-width graph. I can't see that one for real until then.

@@ -1,0 +1,103 @@
+/* Shared by every GitHub key's settings page. The rows hold sentences,
+   not text boxes, so they get a little room, and the top padding lines
+   the first line up with the row's label (same as Mac Vitals). */
+.words {
+	padding: 7px 0 6px;
+	line-height: 1.45;
+	color: var(--input-font-color, #d8d8d8);
+	font-size: var(--font-size, 9pt);
+}
+.words ul {
+	margin: 0;
+	padding-left: 16px;
+}
+.words b {
+	font-weight: 600;
+}
+
+/* The repo picker: the picked repo as a button, and under it, once
+   clicked, a search box and the list. */
+.picker {
+	position: relative;
+	font-size: var(--font-size, 9pt);
+	color: var(--input-font-color, #d8d8d8);
+}
+.picker button,
+.picker input {
+	box-sizing: border-box;
+	width: 100%;
+	height: 26px;
+	padding: 0 8px;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	background: var(--input-bg-color, #3d3d3d);
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	outline: none;
+}
+.picker button {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+}
+.picker button::after {
+	content: "";
+	margin-left: auto;
+	border: 4px solid transparent;
+	border-top-color: #9a9a9a;
+	transform: translateY(2px);
+}
+.picker .panel {
+	display: none;
+	position: absolute;
+	z-index: 10;
+	left: 0;
+	right: 0;
+	margin-top: 4px;
+	padding: 6px;
+	border-radius: 6px;
+	background: #2b2b2b;
+	box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+.picker.open .panel {
+	display: block;
+}
+.picker ul {
+	max-height: 220px;
+	overflow-y: auto;
+	margin: 6px 0 0;
+	padding: 0;
+	list-style: none;
+}
+.picker li {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 5px 8px;
+	border-radius: 4px;
+	cursor: pointer;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.picker li:hover {
+	background: #3a3a3a;
+}
+/* The picked one is pink, my color, not the usual blue. */
+.picker li.picked {
+	color: #ff7eb6;
+}
+.picker li.follow {
+	color: #9a9a9a;
+}
+.picker .lock {
+	flex: none;
+	width: 11px;
+	height: 11px;
+}
+.picker .note {
+	padding: 5px 8px;
+	color: #9a9a9a;
+}
