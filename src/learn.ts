@@ -73,7 +73,9 @@ export function pullLesson(repo: string | undefined, counts: Counts | undefined,
 
 export function issueLesson(repo: string | undefined, counts: Counts | undefined, message: string | undefined, now: number): Lesson {
 	let right = waiting(repo, message);
-	if (!right && counts) {
+	if (!right && counts?.off) {
+		right = `Issues are turned off for ${repo} in its settings, so there's nowhere to file one. Forks start that way.`;
+	} else if (!right && counts) {
 		right =
 			counts.open === 0
 				? `No open issues on ${repo}. ${count(counts.closed, "issue")} closed so far.`
@@ -94,7 +96,7 @@ export function issueLesson(repo: string | undefined, counts: Counts | undefined
 			["Label", "a colored tag for sorting issues, like bug or idea"],
 		],
 		tryThis: "Open an issue called \"test the deck\" on a repo, watch the key go up, then close it.",
-		press: "Opens the repo's issues on GitHub.",
+		press: "Opens the repo's issues on GitHub, or its settings when issues are turned off.",
 	};
 }
 

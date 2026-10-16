@@ -301,6 +301,7 @@ export type Counts = {
 	open: number;
 	closed: number; // for pull requests, merged and closed without merging
 	merged: number; // pull requests only
+	off?: boolean; // issues only: turned off in the repo's settings
 	oldest?: string; // when the oldest open one was opened
 };
 
@@ -364,7 +365,9 @@ export async function fetchIssueCounts(token: string | undefined, owner: string,
 	if (!result.ok) return result;
 	const repo = result.data.repository;
 	if (!repo) return { ok: false, message: "Repo not found", short: "No repo" };
-	if (!repo.hasIssuesEnabled) return { ok: false, message: "Issues are turned off", short: "Issues off" };
+	// Issues turned off in the repo's settings (forks start that way) is an
+	// answer, not a problem, so it comes back like any other count.
+	if (!repo.hasIssuesEnabled) return { ok: true, data: { url: repo.url, private: repo.isPrivate, open: 0, closed: 0, merged: 0, off: true } };
 	return {
 		ok: true,
 		data: {

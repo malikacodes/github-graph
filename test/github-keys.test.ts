@@ -259,3 +259,13 @@ test("releaseLesson: none yet, and a pre-release says so", () => {
 	const pre = { tag: "v2.0.0-beta", name: "", at: "2026-10-13T12:00:00Z", pre: true, url: "" };
 	assert.strictEqual(releaseLesson("leak-flow", pre, undefined, NOW).now, "leak-flow is on v2.0.0-beta, a pre-release, released 2 days ago.");
 });
+
+// Protects issues turned off (forks start that way) from showing as a
+// red problem: it's an answer, with its own calm sentence.
+test("issues turned off is an answer, not an error", () => {
+	const off = { url: "", private: false, open: 0, closed: 0, merged: 0, off: true };
+	assert.strictEqual(
+		issueLesson("WhisperKey", off, undefined, NOW).now,
+		"Issues are turned off for WhisperKey in its settings, so there's nowhere to file one. Forks start that way.",
+	);
+});

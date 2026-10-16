@@ -190,7 +190,7 @@ under it, and a few gray words at the bottom, on plain black.
 |---|---|---|
 | Repo | The repo the other keys follow, with a small lock if it's private | Steps to the next repo, newest push first, and round again |
 | Pull Requests | How many are open | Opens them on GitHub |
-| Issues | How many are open (or how many are closed, when none are open) | Opens them on GitHub |
+| Issues | How many are open (or how many are closed, when none are open, or a calm gray **off** when issues are turned off, like on a fork) | Opens them on GitHub, or the setting to turn them on |
 | Workflow | The latest GitHub Actions run: passed, failed or running | Opens that run on GitHub |
 | Repo Stats | Stars, forks, watchers or the main language, picked under **Show** | Opens that page on GitHub |
 | Commit Activity | A bar for each of the last eight weeks of commits on main | Opens the commit history |
@@ -360,7 +360,7 @@ something like `Up to date. Last checked 2:41 PM.`
   merged pull requests and the first 30 branches.
 - Tests cover the streak math, the Branch Map's sorting and layout, and
   the GitHub keys' drawing, repo picking and settings page sentences
-  (`npm test`, 70 of them). The rest of the drawing I checked by hand on
+  (`npm test`, 71 of them). The rest of the drawing I checked by hand on
   the actual device.
 - A year with 54 week columns (2028 is the next one) gets slightly smaller
   squares on the full-width graph. I can't see that one for real until then.
