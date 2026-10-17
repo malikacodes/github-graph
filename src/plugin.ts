@@ -17,11 +17,19 @@ import { RepoStats } from "./actions/repo-stats.ts";
 import { Security } from "./actions/security.ts";
 import { WideGraph } from "./actions/wide-graph.ts";
 import { Workflow } from "./actions/workflow.ts";
+import type { GlobalSettings } from "./data.ts";
+import { logWith, settingsChanged, wokeUp } from "./refresh.ts";
 
 // Keep this at "info". The "trace" level writes every message between the
 // plugin and Stream Deck into the log file, and one of those messages is the
 // global settings, which is where the GitHub token lives.
 streamDeck.logger.setLevel("info");
+
+// The refresh clock never imports the SDK itself (see refresh.ts), so it
+// gets its log line and its two events from here.
+logWith((line) => streamDeck.logger.error(line));
+streamDeck.settings.onDidReceiveGlobalSettings<GlobalSettings>((ev) => settingsChanged(ev.settings));
+streamDeck.system.onSystemDidWakeUp(wokeUp);
 
 streamDeck.actions.registerAction(new ContributionGraph());
 streamDeck.actions.registerAction(new WideGraph());
