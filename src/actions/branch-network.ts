@@ -12,12 +12,12 @@ import streamDeck, {
 } from "@elgato/streamdeck";
 
 import { laneLink, lanesFrom, layout, type Local, parseRepo, pick, type Placed } from "../branches.ts";
-import type { GlobalSettings } from "../data.ts";
 import { drawBranches } from "../draw.ts";
-import { focus, forget, onFocus, owner, token as getToken } from "../focus.ts";
+import { focus, onFocus, owner, token as getToken } from "../focus.ts";
 import { readLocal } from "../git.ts";
 import { fetchNetwork, type Network } from "../github-repo.ts";
 import { whichRepo } from "../picking.ts";
+import { register, safely, unregister } from "../refresh.ts";
 import { sendRepos } from "./github-key.ts";
 
 // The repo is the one thing each dial remembers: one of mine, picked in
@@ -38,8 +38,6 @@ type Repo = {
 	updating: boolean;
 };
 
-const DEFAULT_MINUTES = 30;
-
 // A metro map of one repo's branches: a loop for every merged pull request
 // and an open lane for every branch that isn't merged yet. Put it on two
 // or more dials next to each other, all set to the same repo, and they
@@ -59,55 +57,38 @@ export class BranchNetwork extends SingletonAction<Settings> {
 	// same repo share one entry, so GitHub only gets asked once for them.
 	private repos = new Map<string, Repo>();
 
-	private nextRefresh: NodeJS.Timeout | undefined;
-	private settingsSettled: NodeJS.Timeout | undefined;
-	private lastSettings = "";
-
 	constructor() {
 		super();
 
-		// A new repo on the Repo key moves every dial that follows it.
-		onFocus(async () => {
-			for (const [id, setting] of this.pinned) if (!setting) this.setRepo(id, "");
-			await this.showAll();
-			await this.refreshMissing();
-		});
-
-		// A new token or refresh time on the settings page. Same one second
-		// wait as data.ts, since the token box saves while I'm still pasting.
-		// It only counts if one of them really changed. Otherwise anything
-		// that echoes the settings back without a change (my pretend deck
-		// does) would set off a refresh, which reads the settings, which
-		// echoes them again, once a second forever.
-		streamDeck.settings.onDidReceiveGlobalSettings<GlobalSettings>((ev) => {
-			const now = `${ev.settings.token ?? ""}|${ev.settings.refreshMinutes ?? ""}`;
-			if (now === this.lastSettings) return;
-			this.lastSettings = now;
-
-			clearTimeout(this.settingsSettled);
-			this.settingsSettled = setTimeout(() => {
-				forget();
-				void this.refreshAll();
-			}, 1000);
-		});
+		onFocus(() => safely(this.followed(), "branches"));
 	}
 
+	// A new repo on the Repo key moves every dial that follows it.
+	private async followed(): Promise<void> {
+		for (const [id, setting] of this.pinned) if (!setting) this.setRepo(id, "");
+		await this.showAll();
+		await this.refreshMissing();
+	}
+
+	// The first dial puts the map's refresh on the shared clock, which runs
+	// it right away and then on every beat (see refresh.ts). Later dials
+	// just fetch whatever repo isn't loaded yet.
 	override async onWillAppear(ev: WillAppearEvent<Settings>): Promise<void> {
 		if (!ev.action.isDial()) return;
 
 		this.setRepo(ev.action.id, ev.payload.settings.repo);
 		await this.showAll();
 
-		// The timer starts with the first dial, and every refresh sets the
-		// next one, so there's only ever one timer going.
-		if (!this.nextRefresh) void this.refreshAll();
-		else void this.refreshMissing();
+		if (this.pinned.size === 1) register("branches", () => this.refreshAll());
+		else safely(this.refreshMissing(), "branches");
 	}
 
 	// A dial leaving changes how many share a picture, so everyone redraws.
+	// The last one to go takes the map's refresh off the clock.
 	override async onWillDisappear(ev: WillDisappearEvent<Settings>): Promise<void> {
 		this.repoOf.delete(ev.action.id);
 		this.pinned.delete(ev.action.id);
+		if (this.pinned.size === 0) unregister("branches");
 		await this.showAll();
 	}
 
@@ -179,14 +160,9 @@ export class BranchNetwork extends SingletonAction<Settings> {
 		if (text && !this.repos.has(text)) this.repos.set(text, { busy: false, updating: false });
 	}
 
-	// Refreshes every repo that's on a dial, then sets the timer for the
-	// next round. Repos nobody shows any more are forgotten here.
+	// Refreshes every repo that's on a dial. This is the job on the clock.
+	// Repos nobody shows any more are forgotten here.
 	private async refreshAll(): Promise<void> {
-		const settings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
-		const minutes = Number(settings.refreshMinutes) || DEFAULT_MINUTES;
-		clearTimeout(this.nextRefresh);
-		this.nextRefresh = setTimeout(() => this.refreshAll(), minutes * 60 * 1000);
-
 		const shown = new Set(this.repoOf.values());
 		for (const text of this.repos.keys()) if (!shown.has(text)) this.repos.delete(text);
 		await Promise.all([...shown].map((text) => this.refresh(text)));
