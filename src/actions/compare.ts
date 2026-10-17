@@ -1,11 +1,10 @@
 import streamDeck, { action } from "@elgato/streamdeck";
 
-import { owner, token } from "../focus.ts";
+import { resolveRepo, token } from "../focus.ts";
 import { type Result } from "../github.ts";
 import { fetchBranches, fetchComparison } from "../github-repo.ts";
 import { COLORS, type Face } from "../key-art.ts";
 import { compareLesson, type CompareView } from "../learn.ts";
-import { parseRepo } from "../branches.ts";
 import { pickBranches } from "../picking.ts";
 import { GitHubKey, type KeySettings } from "./github-key.ts";
 
@@ -58,10 +57,9 @@ export class Compare extends GitHubKey<CompareView> {
 		if (event !== "getBases" && event !== "getHeads") return;
 
 		let names: string[] = [];
-		const parsed = repo ? parseRepo(repo) : undefined;
-		const login = parsed?.owner ? { ok: true as const, data: parsed.owner } : await owner();
-		if (parsed && login.ok) {
-			const branches = await fetchBranches(await token(), login.data, parsed.name);
+		const resolved = repo ? await resolveRepo(repo) : undefined;
+		if (resolved?.ok) {
+			const branches = await fetchBranches(await token(), resolved.data.owner, resolved.data.name);
 			if (branches.ok) names = branches.data.names;
 		}
 
