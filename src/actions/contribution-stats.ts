@@ -6,7 +6,7 @@ import {
 	type WillDisappearEvent,
 } from "@elgato/streamdeck";
 
-import { onChange, refreshNow, start, store } from "../data.ts";
+import { onChange, refreshNow, start, stop, store } from "../data.ts";
 import { drawStatsKey } from "../keys.ts";
 
 const GREEN = "#39d353";
@@ -45,6 +45,7 @@ export class ContributionStats extends SingletonAction {
 		// pages does this) Stream Deck has reset it to the plain icon, so it
 		// needs its picture again even if nothing changed in between.
 		this.sent.delete(ev.action.id);
+		stop();
 
 		// Stream Deck has already taken this key off the list by now. If
 		// another stats key is still showing, the clock has to keep going.

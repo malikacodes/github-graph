@@ -8,7 +8,7 @@ import streamDeck, {
 } from "@elgato/streamdeck";
 
 import { addDays, weekColumns, weekday } from "../calendar.ts";
-import { onChange, refreshNow, start, store } from "../data.ts";
+import { onChange, refreshNow, start, stop, store } from "../data.ts";
 import { drawGraph, drawWeek, WEEKS_SHOWN } from "../draw.ts";
 
 // Which of the two views a dial is on: the graph, or this week. It's the
@@ -41,6 +41,7 @@ export class ContributionGraph extends SingletonAction<Settings> {
 
 	override onWillDisappear(ev: WillDisappearEvent<Settings>): void {
 		this.onWeek.delete(ev.action.id);
+		stop();
 	}
 
 	// A press refreshes. The graph goes gray for a second while it does,

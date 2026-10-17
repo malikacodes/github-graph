@@ -1,6 +1,7 @@
 import streamDeck from "@elgato/streamdeck";
 
 import { type Day, fetchRecent, fetchYear, type Result } from "./github.ts";
+import { register, safely, unregister } from "./refresh.ts";
 
 // These are the plugin's global settings, filled in from the settings page.
 // The token lives here and not in an action's own settings because those
@@ -61,68 +62,48 @@ const busyYears = new Set<number>();
 let historyWanted = false;
 
 const listeners: (() => void)[] = [];
-let started = false;
-let nextRefresh: NodeJS.Timeout | undefined;
-let settingsSettled: NodeJS.Timeout | undefined;
+
+// How many graphs and keys are showing right now. The first one puts the
+// contributions job on the clock and the last one to go takes it off, so
+// GitHub isn't asked for my days while no graph is on screen.
+let showing = 0;
+let answering = false;
 
 // Actions call this once to say "run this whenever the whiteboard changes".
 export function onChange(redraw: () => void): void {
 	listeners.push(redraw);
 }
 
-// Called by every action when it shows up. Only the first call does anything.
+// Called by every graph and key when it shows up, and stop() when it goes.
+// The clock runs the job right away for the first one, then on every beat
+// (see refresh.ts). The job says whether it worked, which is what gets a
+// second try after the Mac wakes up.
 export function start(): void {
-	if (started) return;
-	started = true;
-
-	// Fires when something changes on the settings page. The token field
-	// saves while you're still typing or pasting, so wait a second for it
-	// to settle before trying the new token on GitHub.
-	streamDeck.settings.onDidReceiveGlobalSettings(() => {
-		clearTimeout(settingsSettled);
-		settingsSettled = setTimeout(refresh, 1000);
-	});
+	showing++;
+	if (showing > 1) return;
 
 	// A settings page asks for the status when it opens (see ui/status.js).
 	// After that, changed() keeps it up to date for as long as it's open.
 	// Only that exact question gets an answer, since the repo pickers
-	// send their own questions through the same door.
-	streamDeck.ui.onSendToPlugin((ev) => {
-		if (ev.payload !== "status") return;
-		void streamDeck.ui.sendToPropertyInspector(status());
-	});
+	// send their own questions through the same door. Listened for once,
+	// however many times the job comes and goes.
+	if (!answering) {
+		answering = true;
+		streamDeck.ui.onSendToPlugin((ev) => {
+			if (ev.payload !== "status") return;
+			safely(streamDeck.ui.sendToPropertyInspector(status()), "status");
+		});
+	}
 
-	// A timer can be hours late after the Mac has been asleep, so waking up
-	// triggers a refresh of its own. Wi-Fi usually takes a few seconds to
-	// come back, which is why it waits first, and why it gets one more try
-	// if the first one fails. Without that, the dials would say "No
-	// internet" until the next timer came around.
-	streamDeck.system.onSystemDidWakeUp(() => {
-		setTimeout(async () => {
-			await refresh();
-			if (store.message) setTimeout(refresh, 20 * 1000);
-		}, 5 * 1000);
+	register("contributions", async () => {
+		await refresh();
+		return !store.message;
 	});
-
-	void refresh();
-	refreshAfterMidnight();
 }
 
-// store.today only moves when a refresh happens, so without this the daily
-// goal key would keep showing yesterday's full ring until the regular
-// timer came around, which can be hours. This is an alarm clock set for
-// one minute past midnight on the Mac's clock. When it goes off it
-// refreshes and then sets itself again for the next night. The extra
-// minute is there so GitHub has rolled over too by the time it's asked.
-function refreshAfterMidnight(): void {
-	// Hour 24 doesn't exist, so the date rolls over to tomorrow at 00:01.
-	const alarm = new Date();
-	alarm.setHours(24, 1, 0, 0);
-
-	setTimeout(() => {
-		void refresh();
-		refreshAfterMidnight();
-	}, alarm.getTime() - Date.now());
+export function stop(): void {
+	showing = Math.max(0, showing - 1);
+	if (showing === 0) unregister("contributions");
 }
 
 async function token(): Promise<string | undefined> {
@@ -139,7 +120,7 @@ function failed(message: string, short: string): void {
 
 function changed(): void {
 	for (const redraw of listeners) redraw();
-	void streamDeck.ui.sendToPropertyInspector(status());
+	safely(streamDeck.ui.sendToPropertyInspector(status()), "status");
 }
 
 // What's going on, as one plain sentence for the Status line on the
@@ -173,16 +154,23 @@ export function status({ updating, message, fetchedAt }: Pick<typeof store, "upd
 }
 
 // Downloads the last 12 months again and tells every action to redraw.
-export async function refresh(): Promise<void> {
+// A refresh that starts while one is still on its way joins it instead
+// of asking GitHub twice: the clock's beat, a press, the settings page and
+// waking up can all land in the same second.
+let inFlight: Promise<void> | undefined;
+export function refresh(): Promise<void> {
+	inFlight ??= download().finally(() => {
+		inFlight = undefined;
+	});
+	return inFlight;
+}
+
+async function download(): Promise<void> {
 	const settings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
 
-	// Restart the countdown on every refresh, whether it came from the
-	// timer, a dial press, or a settings change. That way a manual refresh
-	// doesn't get followed by an automatic one a minute later.
-	const minutes = Number(settings.refreshMinutes) || DEFAULT_MINUTES;
-	store.refreshMinutes = minutes;
-	clearTimeout(nextRefresh);
-	nextRefresh = setTimeout(refresh, minutes * 60 * 1000);
+	// The stats key uses this to say how fresh the numbers are. The clock
+	// reads the same setting for its beat.
+	store.refreshMinutes = Number(settings.refreshMinutes) || DEFAULT_MINUTES;
 
 	const result = await fetchRecent(settings.token?.trim());
 	if (result.ok) {
@@ -215,7 +203,7 @@ export async function refresh(): Promise<void> {
 
 	// Not waited for. The past years can take a few seconds the first time,
 	// and a press shouldn't sit on "updating" for all of it.
-	if (result.ok && historyWanted) void loadHistory();
+	if (result.ok && historyWanted) safely(loadHistory(), "history");
 }
 
 // What a press does on every action. GitHub usually answers in well under
@@ -292,7 +280,7 @@ export function wantHistory(): void {
 
 	// If the first download hasn't happened yet there's no "year I joined"
 	// to start from, and the refresh that brings it will start this itself.
-	if (store.fetchedAt) void loadHistory();
+	if (store.fetchedAt) safely(loadHistory(), "history");
 }
 
 // Loads every year from the one I joined GitHub up to last year, one
