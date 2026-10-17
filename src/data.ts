@@ -33,8 +33,8 @@ export const store = {
 	login: "",
 
 	// When the last successful download finished (0 means never), and how
-	// often the timer is set to run. The stats key uses these to say how
-	// fresh the numbers are.
+	// often the clock ticks. The stats key uses these to say how fresh the
+	// numbers are.
 	fetchedAt: 0,
 	refreshMinutes: DEFAULT_MINUTES,
 

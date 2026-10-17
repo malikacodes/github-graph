@@ -83,10 +83,15 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 	// Later keys just ask for their own repo.
 	override async onWillAppear(ev: WillAppearEvent<KeySettings>): Promise<void> {
 		if (!ev.action.isKey()) return;
+
+		// Whether this is the first key is decided before the first wait:
+		// two keys of one kind appear in the same moment when a page opens,
+		// and after a wait both would see two.
+		const first = this.settings.size === 0;
 		this.settings.set(ev.action.id, ev.payload.settings);
 		await this.show(ev.action);
 
-		if (this.settings.size === 1) register(this.kind, () => this.refreshAll());
+		if (first) register(this.kind, () => this.refreshAll());
 		else await this.refresh(ev.action.id);
 	}
 
@@ -102,9 +107,10 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 	}
 
 	// The name this kind of key goes on the clock under: its UUID from the
-	// manifest, which every kind has once the plugin has registered it.
+	// manifest. The decorator fills it in before any key can appear, so it
+	// can't be missing here.
 	private get kind(): string {
-		return this.manifestId ?? "github-key";
+		return this.manifestId!;
 	}
 
 	override async onDidReceiveSettings(ev: DidReceiveSettingsEvent<KeySettings>): Promise<void> {
@@ -159,7 +165,7 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 
 	// Asks GitHub what one key needs, unless the same thing was asked in the
 	// last minute (several keys showing the same thing, or switching back
-	// and forth on the Repo key). force is for the timer.
+	// and forth on the Repo key). force is for the clock's beat.
 	private async refresh(id: string, force = false): Promise<void> {
 		const repo = this.repoOf(id);
 		const name = this.keyOf(id);

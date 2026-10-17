@@ -76,10 +76,13 @@ export class BranchNetwork extends SingletonAction<Settings> {
 	override async onWillAppear(ev: WillAppearEvent<Settings>): Promise<void> {
 		if (!ev.action.isDial()) return;
 
+		// Decided before the first wait: the four dials appear in the same
+		// moment when the page opens, and after a wait all would see four.
+		const first = this.pinned.size === 0;
 		this.setRepo(ev.action.id, ev.payload.settings.repo);
 		await this.showAll();
 
-		if (this.pinned.size === 1) register("branches", () => this.refreshAll());
+		if (first) register("branches", () => this.refreshAll());
 		else safely(this.refreshMissing(), "branches");
 	}
 
