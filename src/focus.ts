@@ -1,5 +1,6 @@
 import streamDeck from "@elgato/streamdeck";
 
+import { parseRepo } from "./branches.ts";
 import { type GlobalSettings, store } from "./data.ts";
 import { fetchLogin, fetchRepos, type RepoListing, type Result } from "./github.ts";
 import { onSettingsChange } from "./refresh.ts";
@@ -40,6 +41,20 @@ export async function owner(): Promise<Result<string>> {
 	const result = await fetchLogin(await token());
 	if (result.ok) login = result.data;
 	return result;
+}
+
+// Turns a repo setting into the owner and name GitHub wants. A name alone
+// is one of mine, so my username goes in front of it. "someone/their-repo"
+// is taken as written. mine is who to ask for my username, and is only a
+// parameter so the tests can stand in for owner().
+export async function resolveRepo(text: string, mine = owner): Promise<Result<{ owner: string; name: string }>> {
+	const parsed = parseRepo(text);
+	if (!parsed) return { ok: false, message: "That isn't a repo name", short: "Bad name" };
+	if (parsed.owner) return { ok: true, data: { owner: parsed.owner, name: parsed.name } };
+
+	const login = await mine();
+	if (!login.ok) return login;
+	return { ok: true, data: { owner: login.data, name: parsed.name } };
 }
 
 // My repos, newest push first. Kept for ten minutes, since every settings
