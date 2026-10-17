@@ -8,8 +8,7 @@ import streamDeck, {
 	type WillDisappearEvent,
 } from "@elgato/streamdeck";
 
-import { parseRepo } from "../branches.ts";
-import { focus, isPrivate, onFocus, owner, repoList, token } from "../focus.ts";
+import { focus, isPrivate, onFocus, repoList, resolveRepo, token } from "../focus.ts";
 import type { Result } from "../github.ts";
 import type { Face } from "../key-art.ts";
 import { drawGithubKey } from "../key-art.ts";
@@ -44,9 +43,9 @@ type Known<T> = {
 // where a press goes.
 export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 	protected abstract load(token: string | undefined, owner: string, name: string, settings: KeySettings): Promise<Result<T>>;
-	protected abstract face(data: T, repo: string, settings: KeySettings): Face;
-	protected abstract lesson(repo: string | undefined, data: T | undefined, message: string | undefined, settings: KeySettings): Lesson;
-	protected abstract link(data: T | undefined, repo: string, url: string, settings: KeySettings): string;
+	protected abstract face(data: T, subject: string, settings: KeySettings): Face;
+	protected abstract lesson(subject: string | undefined, data: T | undefined, message: string | undefined, settings: KeySettings): Lesson;
+	protected abstract link(data: T | undefined, subject: string, url: string, settings: KeySettings): string;
 
 	// Which of this key's settings change what it asks GitHub. Answers are
 	// saved per repo plus these, so two keys on the same repo with different
@@ -56,14 +55,22 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 	}
 
 	// For a settings page question other than the two every key answers.
-	protected async answer(_event: string, _id: string, _repo: string | undefined): Promise<void> {}
+	protected async answer(_event: string, _id: string, _subject: string | undefined): Promise<void> {}
 
 	// The drawing and color this key uses while loading or when it's stuck.
 	protected abstract readonly look: Pick<Face, "icon" | "color">;
 
-	// Whether this kind of key follows the Repo key. Projects doesn't: a
-	// board belongs to me, not to a repo, so it never needs my username
-	// either.
+	// What a key is about, from its settings: for most keys the repo it's
+	// pinned to, or the Repo key's pick when it isn't pinned. Projects
+	// answers with my boards instead, since a board belongs to me, not to
+	// a repo. Answers are saved under this, and it's what the face, the
+	// lesson and the link get handed.
+	protected subject(settings: KeySettings): string | undefined {
+		return whichRepo(settings.repo, focus.repo);
+	}
+
+	// Whether this kind of key follows the Repo key and names a repo on
+	// GitHub. Projects doesn't, so its subject is never looked up as one.
 	protected readonly follows: boolean = true;
 
 	private settings = new Map<string, KeySettings>();
@@ -120,15 +127,16 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 		await this.explain(ev.action.id);
 	}
 
-	// A press opens the page on GitHub that the key is about.
+	// A press opens the page on GitHub that the key is about. url is the
+	// repo's front page, for keys whose link is a page under it, and just
+	// GitHub when there's no repo to point at.
 	override async onKeyDown(ev: KeyDownEvent<KeySettings>): Promise<void> {
-		const repo = this.repoOf(ev.action.id);
-		if (!repo) return;
+		const subject = this.subjectOf(ev.action.id);
+		if (!subject) return;
 		const known = this.known.get(this.keyOf(ev.action.id)!);
-		const parsed = parseRepo(repo);
-		const login = parsed?.owner || !this.follows ? undefined : await owner();
-		const url = `https://github.com/${parsed?.owner ?? (login?.ok ? login.data : "")}/${parsed?.name ?? repo}`;
-		await streamDeck.system.openUrl(this.link(known?.data, repo, url, this.settingsOf(ev.action.id)));
+		const repo = this.follows ? await resolveRepo(subject) : undefined;
+		const url = repo?.ok ? `https://github.com/${repo.data.owner}/${repo.data.name}` : "https://github.com/";
+		await streamDeck.system.openUrl(this.link(known?.data, subject, url, this.settingsOf(ev.action.id)));
 	}
 
 	// The settings page asks for two things: its learning rows, and the repo
@@ -137,21 +145,21 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 		const event = ev.payload?.event ?? "";
 		if (event === "explain") await this.explain(ev.action.id);
 		else if (event === "getRepos") await sendRepos(this.settingsOf(ev.action.id).repo ?? "", true);
-		else await this.answer(event, ev.action.id, this.repoOf(ev.action.id));
+		else await this.answer(event, ev.action.id, this.subjectOf(ev.action.id));
 	}
 
 	private settingsOf(id: string): KeySettings {
 		return this.settings.get(id) ?? {};
 	}
 
-	protected repoOf(id: string): string | undefined {
-		return whichRepo(this.settingsOf(id).repo, focus.repo);
+	private subjectOf(id: string): string | undefined {
+		return this.subject(this.settingsOf(id));
 	}
 
-	// The name a key's answer is saved under: its repo plus its variant.
+	// The name a key's answer is saved under: its subject plus its variant.
 	private keyOf(id: string): string | undefined {
-		const repo = this.repoOf(id);
-		return repo && `${repo}|${this.variant(this.settingsOf(id))}`;
+		const subject = this.subjectOf(id);
+		return subject && `${subject}|${this.variant(this.settingsOf(id))}`;
 	}
 
 	// Refreshes every repo a key of this kind is showing. This is the job on
@@ -167,9 +175,9 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 	// last minute (several keys showing the same thing, or switching back
 	// and forth on the Repo key). force is for the clock's beat.
 	private async refresh(id: string, force = false): Promise<void> {
-		const repo = this.repoOf(id);
+		const subject = this.subjectOf(id);
 		const name = this.keyOf(id);
-		if (!repo || !name) return this.showAll();
+		if (!subject || !name) return this.showAll();
 		const known = this.known.get(name) ?? { at: 0, busy: false };
 		this.known.set(name, known);
 		if (known.busy || (!force && Date.now() - known.at < 60 * 1000)) return this.showAll();
@@ -177,7 +185,7 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 		known.busy = true;
 		let result: Result<T>;
 		try {
-			result = await this.ask(repo, id);
+			result = await this.ask(subject, id);
 		} catch (error) {
 			// Anything unexpected (a reply that isn't what GitHub usually
 			// sends) becomes a message on the key, not a stuck "loading".
@@ -192,7 +200,7 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 		} else {
 			known.message = result.message;
 			known.short = result.short;
-			streamDeck.logger.warn(`${this.manifestId} for ${repo} failed: ${result.message}${result.detail ? ` (GitHub: ${result.detail})` : ""}`);
+			streamDeck.logger.warn(`${this.manifestId} for ${subject} failed: ${result.message}${result.detail ? ` (GitHub: ${result.detail})` : ""}`);
 		}
 
 		await this.showAll();
@@ -200,13 +208,14 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 		if (open && this.settings.has(open.id)) await this.explain(open.id);
 	}
 
-	// Works out whose repo it is, then asks the key's own question.
-	private async ask(repo: string, id: string): Promise<Result<T>> {
-		const parsed = parseRepo(repo);
-		if (!parsed) return { ok: false, message: "That isn't a repo name", short: "Bad name" };
-		const login = parsed.owner || !this.follows ? { ok: true as const, data: parsed.owner ?? "" } : await owner();
-		if (!login.ok) return login;
-		return this.load(await token(), login.data, parsed.name, this.settingsOf(id));
+	// Works out whose repo it is, then asks the key's own question. A key
+	// that isn't about a repo gets its subject as the name and no owner.
+	private async ask(subject: string, id: string): Promise<Result<T>> {
+		const settings = this.settingsOf(id);
+		if (!this.follows) return this.load(await token(), "", subject, settings);
+		const repo = await resolveRepo(subject);
+		if (!repo.ok) return repo;
+		return this.load(await token(), repo.data.owner, repo.data.name, settings);
 	}
 
 	// A new repo on the Repo key: every key that follows it asks about the
@@ -228,14 +237,14 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 	private sent = new Map<string, string>();
 
 	private async show(key: KeyAction<KeySettings>): Promise<void> {
-		const repo = this.repoOf(key.id);
-		const known = repo ? this.known.get(this.keyOf(key.id)!) : undefined;
+		const subject = this.subjectOf(key.id);
+		const known = subject ? this.known.get(this.keyOf(key.id)!) : undefined;
 
 		// The last good numbers win over a failure, so a short wifi drop
 		// doesn't blank the key. The reason is still on the settings page.
 		let face: Face;
-		if (!repo) face = { ...this.look, big: "–", small: "pick a repo", quiet: true };
-		else if (known?.data) face = { ...this.face(known.data, repo, this.settingsOf(key.id)), lock: isPrivate(repo) };
+		if (!subject) face = { ...this.look, big: "–", small: "pick a repo", quiet: true };
+		else if (known?.data) face = { ...this.face(known.data, subject, this.settingsOf(key.id)), lock: isPrivate(subject) };
 		else if (known?.message) face = { ...this.look, big: "–", small: known.short ?? "can't check", quiet: true, alarm: true };
 		else face = { ...this.look, big: "–", small: "loading", quiet: true };
 
@@ -249,10 +258,10 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 	// a page that isn't showing, so this only goes out when it's this key's.
 	private async explain(id: string): Promise<void> {
 		if (streamDeck.ui.action?.id !== id) return;
-		const repo = this.repoOf(id);
-		const known = repo ? this.known.get(this.keyOf(id)!) : undefined;
+		const subject = this.subjectOf(id);
+		const known = subject ? this.known.get(this.keyOf(id)!) : undefined;
 		const message = known?.data ? undefined : known?.message;
-		await streamDeck.ui.sendToPropertyInspector({ event: "explain", lesson: this.lesson(repo, known?.data, message, this.settingsOf(id)) });
+		await streamDeck.ui.sendToPropertyInspector({ event: "explain", lesson: this.lesson(subject, known?.data, message, this.settingsOf(id)) });
 	}
 }
 
