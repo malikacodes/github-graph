@@ -46,7 +46,7 @@ function flatten(calendar: Calendar): Day[] {
 // Sends one question to GitHub and sorts out the ways it can go wrong.
 // "viewer" in the queries means whoever owns the token, which is why
 // there's no username setting.
-async function ask<T>(token: string | undefined, query: string, variables: object): Promise<Result<T>> {
+export async function ask<T>(token: string | undefined, query: string, variables: object): Promise<Result<T>> {
 	if (!token) {
 		return { ok: false, message: "Add a token in settings", short: "No token" };
 	}
@@ -392,7 +392,7 @@ export type Run = {
 	url?: string;
 };
 
-async function rest<T>(token: string | undefined, path: string): Promise<Result<T>> {
+export async function rest<T>(token: string | undefined, path: string): Promise<Result<T>> {
 	let response: Response;
 	try {
 		response = await fetch(`https://api.github.com/repos/${path}`, {
