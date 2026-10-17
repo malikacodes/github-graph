@@ -82,7 +82,8 @@ export class DailyGoal extends SingletonAction<Settings> {
 		this.sent.delete(ev.action.id);
 		this.started.delete(ev.action.id);
 		stopAnimating(ev.action.id);
-		stop();
+		// Only a key ever called start(), so only a key calls stop().
+		if (ev.payload.controller === "Keypad") stop();
 	}
 
 	// A press always refreshes. If today's goal is already met it plays the

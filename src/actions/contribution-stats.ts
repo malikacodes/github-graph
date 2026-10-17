@@ -45,7 +45,8 @@ export class ContributionStats extends SingletonAction {
 		// pages does this) Stream Deck has reset it to the plain icon, so it
 		// needs its picture again even if nothing changed in between.
 		this.sent.delete(ev.action.id);
-		stop();
+		// Only a key ever called start(), so only a key calls stop().
+		if (ev.payload.controller === "Keypad") stop();
 
 		// Stream Deck has already taken this key off the list by now. If
 		// another stats key is still showing, the clock has to keep going.

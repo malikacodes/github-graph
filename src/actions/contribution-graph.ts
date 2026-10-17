@@ -39,9 +39,10 @@ export class ContributionGraph extends SingletonAction<Settings> {
 		start();
 	}
 
+	// Only a dial ever called start(), so only a dial calls stop().
 	override onWillDisappear(ev: WillDisappearEvent<Settings>): void {
 		this.onWeek.delete(ev.action.id);
-		stop();
+		if (ev.payload.controller === "Encoder") stop();
 	}
 
 	// A press refreshes. The graph goes gray for a second while it does,

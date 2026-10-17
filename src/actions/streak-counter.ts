@@ -92,7 +92,8 @@ export class StreakCounter extends SingletonAction<Settings> {
 		this.flared.delete(ev.action.id);
 		stopAnimating(ev.action.id);
 		stopIdling(ev.action.id);
-		stop();
+		// Only a key ever called start(), so only a key calls stop().
+		if (ev.payload.controller === "Keypad") stop();
 	}
 
 	// A press always refreshes. If there's a fire it flares up first, and

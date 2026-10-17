@@ -4,6 +4,7 @@ import {
 	type DialRotateEvent,
 	SingletonAction,
 	type WillAppearEvent,
+	type WillDisappearEvent,
 } from "@elgato/streamdeck";
 
 import { weekColumns } from "../calendar.ts";
@@ -32,8 +33,9 @@ export class WideGraph extends SingletonAction {
 		start();
 	}
 
-	override onWillDisappear(): void {
-		stop();
+	// Only a dial ever called start(), so only a dial calls stop().
+	override onWillDisappear(ev: WillDisappearEvent): void {
+		if (ev.payload.controller === "Encoder") stop();
 	}
 
 	override async onDialDown(): Promise<void> {
