@@ -8,11 +8,11 @@ import {
 	type WillDisappearEvent,
 } from "@elgato/streamdeck";
 
-import { animate, idle, stopAnimating, stopIdling } from "../animate";
-import { onChange, refreshNow, start, store, wantHistory } from "../data";
-import { SWAY_MS, TIERS } from "../flames";
-import { drawStreakKey } from "../keys";
-import { type Mode, streaks } from "../streak";
+import { animate, idle, stopAnimating, stopIdling } from "../animate.ts";
+import { onChange, refreshNow, start, store, wantHistory } from "../data.ts";
+import { SWAY_MS, TIERS } from "../flames.ts";
+import { drawStreakKey } from "../keys.ts";
+import { type Mode, streaks } from "../streak.ts";
 
 const GREY = "#8b949e";
 const RED = "#f85149";

@@ -1,6 +1,6 @@
 import streamDeck from "@elgato/streamdeck";
 
-import { type Day, fetchRecent, fetchYear, type Result } from "./github";
+import { type Day, fetchRecent, fetchYear, type Result } from "./github.ts";
 
 // These are the plugin's global settings, filled in from the settings page.
 // The token lives here and not in an action's own settings because those

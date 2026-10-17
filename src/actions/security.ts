@@ -1,9 +1,9 @@
 import { action } from "@elgato/streamdeck";
 
-import { type Alerts, fetchAlerts } from "../github";
-import { COLORS, type Face } from "../key-art";
-import { alertsLesson } from "../learn";
-import { GitHubKey } from "./github-key";
+import { type Alerts, fetchAlerts } from "../github.ts";
+import { COLORS, type Face } from "../key-art.ts";
+import { alertsLesson } from "../learn.ts";
+import { GitHubKey } from "./github-key.ts";
 
 // Open Dependabot alerts on the repo. The shield takes the color of the
 // worst one, and says "off" when Dependabot isn't turned on, because

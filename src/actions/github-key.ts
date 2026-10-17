@@ -8,14 +8,14 @@ import streamDeck, {
 	type WillDisappearEvent,
 } from "@elgato/streamdeck";
 
-import { parseRepo } from "../branches";
-import type { GlobalSettings } from "../data";
-import { focus, forget, isPrivate, onFocus, owner, repoList, token } from "../focus";
-import type { Result } from "../github";
-import type { Face } from "../key-art";
-import { drawGithubKey } from "../key-art";
-import type { Lesson } from "../learn";
-import { whichRepo } from "../picking";
+import { parseRepo } from "../branches.ts";
+import type { GlobalSettings } from "../data.ts";
+import { focus, forget, isPrivate, onFocus, owner, repoList, token } from "../focus.ts";
+import type { Result } from "../github.ts";
+import type { Face } from "../key-art.ts";
+import { drawGithubKey } from "../key-art.ts";
+import type { Lesson } from "../learn.ts";
+import { whichRepo } from "../picking.ts";
 
 // A key's settings. repo is the repo it's pinned to: empty means it
 // follows the Repo key, and every new key starts that way. The rest belong

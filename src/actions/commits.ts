@@ -1,9 +1,9 @@
 import { action } from "@elgato/streamdeck";
 
-import { fetchCommitWeeks } from "../github";
-import { COLORS, type Face, weekBars } from "../key-art";
-import { commitsLesson } from "../learn";
-import { GitHubKey } from "./github-key";
+import { fetchCommitWeeks } from "../github.ts";
+import { COLORS, type Face, weekBars } from "../key-art.ts";
+import { commitsLesson } from "../learn.ts";
+import { GitHubKey } from "./github-key.ts";
 
 // Commits on the repo's main branch: a bar for each of the last eight
 // weeks, and the total for the last four under them.

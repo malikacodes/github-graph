@@ -1,7 +1,7 @@
 import streamDeck from "@elgato/streamdeck";
 
-import { type GlobalSettings, store } from "./data";
-import { fetchLogin, fetchRepos, type RepoListing, type Result } from "./github";
+import { type GlobalSettings, store } from "./data.ts";
+import { fetchLogin, fetchRepos, type RepoListing, type Result } from "./github.ts";
 
 // The repo every GitHub key follows, plus the list the Repo key steps
 // through. Like data.ts, it's one shared whiteboard: the Repo key writes

@@ -1,5 +1,5 @@
-import { asImage } from "./draw";
-import { flame } from "./flames";
+import { asImage } from "./draw.ts";
+import { flame } from "./flames.ts";
 
 // Pictures for the regular keys. A key is 72x72 on most Stream Decks and
 // 144x144 on the sharper ones, so these are drawn on a 144 grid and Stream

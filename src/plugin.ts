@@ -1,22 +1,22 @@
 import streamDeck from "@elgato/streamdeck";
 
-import { BranchNetwork } from "./actions/branch-network";
-import { Commits } from "./actions/commits";
-import { Compare } from "./actions/compare";
-import { GoToPlus, OpenGitHub } from "./actions/deck-keys";
-import { ContributionGraph } from "./actions/contribution-graph";
-import { ContributionStats } from "./actions/contribution-stats";
-import { DailyGoal } from "./actions/daily-goal";
-import { StreakCounter } from "./actions/streak-counter";
-import { Issues } from "./actions/issues";
-import { Projects } from "./actions/projects";
-import { PullRequests } from "./actions/pull-requests";
-import { Releases } from "./actions/releases";
-import { RepoKey } from "./actions/repo-key";
-import { RepoStats } from "./actions/repo-stats";
-import { Security } from "./actions/security";
-import { WideGraph } from "./actions/wide-graph";
-import { Workflow } from "./actions/workflow";
+import { BranchNetwork } from "./actions/branch-network.ts";
+import { Commits } from "./actions/commits.ts";
+import { Compare } from "./actions/compare.ts";
+import { GoToPlus, OpenGitHub } from "./actions/deck-keys.ts";
+import { ContributionGraph } from "./actions/contribution-graph.ts";
+import { ContributionStats } from "./actions/contribution-stats.ts";
+import { DailyGoal } from "./actions/daily-goal.ts";
+import { StreakCounter } from "./actions/streak-counter.ts";
+import { Issues } from "./actions/issues.ts";
+import { Projects } from "./actions/projects.ts";
+import { PullRequests } from "./actions/pull-requests.ts";
+import { Releases } from "./actions/releases.ts";
+import { RepoKey } from "./actions/repo-key.ts";
+import { RepoStats } from "./actions/repo-stats.ts";
+import { Security } from "./actions/security.ts";
+import { WideGraph } from "./actions/wide-graph.ts";
+import { Workflow } from "./actions/workflow.ts";
 
 // Keep this at "info". The "trace" level writes every message between the
 // plugin and Stream Deck into the log file, and one of those messages is the

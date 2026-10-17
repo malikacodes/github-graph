@@ -11,14 +11,14 @@ import streamDeck, {
 	type WillDisappearEvent,
 } from "@elgato/streamdeck";
 
-import { laneLink, lanesFrom, layout, type Local, parseRepo, pick, type Placed } from "../branches";
-import type { GlobalSettings } from "../data";
-import { drawBranches } from "../draw";
-import { focus, forget, onFocus, owner, token as getToken } from "../focus";
-import { readLocal } from "../git";
-import { fetchNetwork, type Network } from "../github";
-import { whichRepo } from "../picking";
-import { sendRepos } from "./github-key";
+import { laneLink, lanesFrom, layout, type Local, parseRepo, pick, type Placed } from "../branches.ts";
+import type { GlobalSettings } from "../data.ts";
+import { drawBranches } from "../draw.ts";
+import { focus, forget, onFocus, owner, token as getToken } from "../focus.ts";
+import { readLocal } from "../git.ts";
+import { fetchNetwork, type Network } from "../github.ts";
+import { whichRepo } from "../picking.ts";
+import { sendRepos } from "./github-key.ts";
 
 // The repo is the one thing each dial remembers: one of mine, picked in
 // the repo picker, like "karaoke-maker". Blank means "follow the Repo key".

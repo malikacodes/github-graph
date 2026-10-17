@@ -1,9 +1,9 @@
 import { action } from "@elgato/streamdeck";
 
-import { fetchStats, type Stats } from "../github";
-import { COLORS, type Face } from "../key-art";
-import { statOf, statsLesson } from "../learn";
-import { GitHubKey, type KeySettings } from "./github-key";
+import { fetchStats, type Stats } from "../github.ts";
+import { COLORS, type Face } from "../key-art.ts";
+import { statOf, statsLesson } from "../learn.ts";
+import { GitHubKey, type KeySettings } from "./github-key.ts";
 
 // One number from the repo's front page, picked under Show in the
 // settings: stars, forks, watchers, or the main language.

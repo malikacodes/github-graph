@@ -1,10 +1,10 @@
 import streamDeck, { action } from "@elgato/streamdeck";
 
-import { token } from "../focus";
-import { type Board, fetchBoard, fetchBoards, type Result } from "../github";
-import { boardPiles, COLORS, type Face } from "../key-art";
-import { boardLesson } from "../learn";
-import { GitHubKey, type KeySettings } from "./github-key";
+import { token } from "../focus.ts";
+import { type Board, fetchBoard, fetchBoards, type Result } from "../github.ts";
+import { boardPiles, COLORS, type Face } from "../key-art.ts";
+import { boardLesson } from "../learn.ts";
+import { GitHubKey, type KeySettings } from "./github-key.ts";
 
 // "No board" is a real answer, so it's wrapped, the same as Releases.
 type View = { board?: Board };

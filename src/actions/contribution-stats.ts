@@ -6,8 +6,8 @@ import {
 	type WillDisappearEvent,
 } from "@elgato/streamdeck";
 
-import { onChange, refreshNow, start, store } from "../data";
-import { drawStatsKey } from "../keys";
+import { onChange, refreshNow, start, store } from "../data.ts";
+import { drawStatsKey } from "../keys.ts";
 
 const GREEN = "#39d353";
 const AMBER = "#d29922";

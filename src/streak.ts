@@ -1,4 +1,4 @@
-import type { Day } from "./github";
+import type { Day } from "./github.ts";
 
 // Works out my current streak and my longest one. Nothing in this file
 // reads the store or talks to Stream Deck. Days go in, two numbers come

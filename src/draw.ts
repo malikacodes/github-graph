@@ -1,5 +1,5 @@
-import type { Placed } from "./branches";
-import type { Day } from "./github";
+import type { Placed } from "./branches.ts";
+import type { Day } from "./github.ts";
 
 // GitHub's dark theme greens. The empty color is a touch lighter than
 // GitHub's, because theirs disappears against the strip's black background.

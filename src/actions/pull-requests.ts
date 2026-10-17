@@ -1,9 +1,9 @@
 import { action } from "@elgato/streamdeck";
 
-import { type Counts, fetchPullCounts } from "../github";
-import { COLORS, type Face } from "../key-art";
-import { pullLesson } from "../learn";
-import { GitHubKey } from "./github-key";
+import { type Counts, fetchPullCounts } from "../github.ts";
+import { COLORS, type Face } from "../key-art.ts";
+import { pullLesson } from "../learn.ts";
+import { GitHubKey } from "./github-key.ts";
 
 // How many pull requests are open on the repo.
 @action({ UUID: "com.malikacodes.github-graph.pulls" })
