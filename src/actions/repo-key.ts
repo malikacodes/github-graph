@@ -5,14 +5,13 @@ import streamDeck, {
 	type SendToPluginEvent,
 	SingletonAction,
 	type WillAppearEvent,
-	type WillDisappearEvent,
 } from "@elgato/streamdeck";
 
 import { focus, isPrivate, onFocus, repoList, setFocus } from "../focus.ts";
 import { COLORS, drawGithubKey } from "../key-art.ts";
 import { repoLesson } from "../learn.ts";
 import { stepRepo } from "../picking.ts";
-import { register, safely, unregister } from "../refresh.ts";
+import { onSettingsChange, safely } from "../refresh.ts";
 import { type KeySettings, sendRepos } from "./github-key.ts";
 
 // The Repo key: it shows the repo every GitHub key follows, and a press
@@ -28,13 +27,15 @@ export class RepoKey extends SingletonAction<KeySettings> {
 	// missing token says so instead of "loading" forever.
 	private problem?: string;
 
-	// The Repo keys showing right now, by id. The first one puts the list's
-	// reload on the shared clock, which also runs it after a new token.
-	private showing = new Set<string>();
-
 	constructor() {
 		super();
 		onFocus(() => safely(this.saveAndShow(), "repo key"));
+
+		// A new token can see repos the old one couldn't (or any at all, the
+		// first time), so the list is asked for again. The clock has already
+		// waited for the token box to settle and made focus.ts forget the
+		// old list by the time this runs.
+		onSettingsChange(() => safely(this.load(), "repo key"));
 	}
 
 	override async onWillAppear(ev: WillAppearEvent<KeySettings>): Promise<void> {
@@ -44,15 +45,7 @@ export class RepoKey extends SingletonAction<KeySettings> {
 		// saved pick. With nothing saved, it's the repo I pushed to last.
 		if (!focus.repo && ev.payload.settings.repo) setFocus(ev.payload.settings.repo);
 		await this.show(ev.action);
-
-		this.showing.add(ev.action.id);
-		if (this.showing.size === 1) register("repo list", () => this.load());
-		else await this.load();
-	}
-
-	override onWillDisappear(ev: WillDisappearEvent<KeySettings>): void {
-		this.showing.delete(ev.action.id);
-		if (this.showing.size === 0) unregister("repo list");
+		await this.load();
 	}
 
 	// Gets the repo list, and picks the newest repo if nothing is picked yet.
