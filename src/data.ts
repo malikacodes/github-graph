@@ -147,10 +147,11 @@ function changed(): void {
 // when something's off, so this is where the reason lives. It's words
 // only. The token never goes in here. The cases are the messages that
 // github.ts hands back, so a reworded message there needs rewording here.
-function status(): string {
-	if (store.updating) return "Checking GitHub...";
+// The whiteboard is passed in so the tests can hand over a made-up one.
+export function status({ updating, message, fetchedAt }: Pick<typeof store, "updating" | "message" | "fetchedAt"> = store): string {
+	if (updating) return "Checking GitHub...";
 
-	switch (store.message) {
+	switch (message) {
 		case undefined:
 			break;
 		case "Add a token in settings":
@@ -162,12 +163,12 @@ function status(): string {
 		case "Token can't read this":
 			return "The token isn't allowed to read my profile.";
 		default:
-			return `${store.message}. It usually clears up on its own.`;
+			return `${message}. It usually clears up on its own.`;
 	}
 
-	if (!store.fetchedAt) return "Loading...";
+	if (!fetchedAt) return "Loading...";
 
-	const time = new Date(store.fetchedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+	const time = new Date(fetchedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 	return `Up to date. Last checked ${time}.`;
 }
 
