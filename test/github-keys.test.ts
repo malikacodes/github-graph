@@ -1,6 +1,7 @@
 import assert from "node:assert";
 import { test } from "node:test";
 
+import { safe } from "../src/draw.ts";
 import { fetchAlerts, fetchCommitWeeks, fetchRelease, pile } from "../src/github.ts";
 import { drawGithubKey, weekBars } from "../src/key-art.ts";
 import { alertsLesson, alertWords, compareLesson, issueLesson, pullLesson, releaseLesson, runLesson, statOf } from "../src/learn.ts";
@@ -52,6 +53,15 @@ test("drawGithubKey: the background is pure black", () => {
 test("drawGithubKey: names are escaped", () => {
 	const picture = svg(drawGithubKey({ icon: "repo", color: "#ff7eb6", big: "a<b&c", small: "x" }));
 	assert.ok(picture.includes("a&lt;b&amp;c"));
+});
+
+// Protects the one escape every picture shares. A quote inside a name
+// would end an SVG attribute early, and the keys used to have their own
+// escape that missed it.
+test("safe: a quote is escaped too, and the keys use the shared escape", () => {
+	assert.strictEqual(safe('say "hi" & <bye>'), "say &quot;hi&quot; &amp; &lt;bye&gt;");
+	const picture = svg(drawGithubKey({ icon: "repo", color: "#ff7eb6", big: 'a"b', small: "x" }));
+	assert.ok(picture.includes("a&quot;b"));
 });
 
 // Protects long repo names from running off the key: they shrink, and only

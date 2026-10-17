@@ -1,30 +1,11 @@
-import { asImage } from "./draw.ts";
+import { BLACK, blackKey, safe } from "./draw.ts";
 import { flame } from "./flames.ts";
 
-// Pictures for the regular keys. A key is 72x72 on most Stream Decks and
-// 144x144 on the sharper ones, so these are drawn on a 144 grid and Stream
-// Deck scales them down where it needs to.
+// Pictures for the contribution keys: stats, the daily goal and the
+// streak. The black tile they're drawn on and the text escaping come
+// from draw.ts, so every picture in the plugin gets them the same way.
 
 const FONT = `font-family="Helvetica Neue, Helvetica, Arial, sans-serif"`;
-
-// Every key is plain black. They started out in GitHub's dark gray
-// (#0d1117), but on the deck that showed up as a gray square next to the
-// keys around it, which are black.
-const BLACK = "#000000";
-
-function key(content: string): string {
-	return asImage(
-		`<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144"><rect width="144" height="144" fill="${BLACK}"/>${content}</svg>`,
-	);
-}
-
-// An SVG is written like HTML, so these three characters mean "a tag or a
-// code starts here" and not themselves. One stray & in a label and the
-// whole key comes out blank. The & has to be swapped first, or it would
-// catch the ones the other two swaps just added.
-function safe(text: string): string {
-	return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-}
 
 // The contribution stats key: the year on top, the total in the middle,
 // and along the bottom a colored dot with how old the data is.
@@ -37,7 +18,7 @@ export function drawStatsKey(year: string, total: string, dot: string, age: stri
 	// asking for that piece to be centered puts both in the middle without
 	// me having to guess how wide the letters come out in whatever font the
 	// key ends up using.
-	return key(
+	return blackKey(
 		`<text x="72" y="34" font-size="20" fill="#8b949e" text-anchor="middle" ${FONT}>${safe(year)}</text>` +
 			`<text x="72" y="${72 + size / 3}" font-size="${size}" font-weight="700" fill="#e6edf3" text-anchor="middle" ${FONT}>${safe(total)}</text>` +
 			`<text x="72" y="127" font-size="18" fill="#8b949e" text-anchor="middle" ${FONT}><tspan fill="${dot}">●</tspan> ${safe(age)}</text>`,
@@ -220,7 +201,7 @@ export function drawGoalKey(count: string, small: string, smallColor: string, fi
 	// The confetti goes on last so it flies over the top of everything.
 	if (burst !== undefined) content += confetti(burst);
 
-	return key(content);
+	return blackKey(content);
 }
 
 // The streak key: a fire that gets bigger with the streak, the streak
@@ -253,5 +234,5 @@ export function drawStreakKey(count: string, small: string, smallColor: string, 
 	// "updating", or what went wrong.
 	content += `<text x="72" y="137" font-size="17" fill="${smallColor}" text-anchor="middle" ${FONT}>${safe(small)}</text>`;
 
-	return key(content);
+	return blackKey(content);
 }
