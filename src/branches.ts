@@ -1,4 +1,4 @@
-import type { Network } from "./github.ts";
+import type { Network } from "./github-repo.ts";
 
 // One branch on the metro map. end is when it merged back into main.
 // An open branch has no end, so its lane runs off the right side.

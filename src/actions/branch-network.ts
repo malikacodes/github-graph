@@ -16,7 +16,7 @@ import type { GlobalSettings } from "../data.ts";
 import { drawBranches } from "../draw.ts";
 import { focus, forget, onFocus, owner, token as getToken } from "../focus.ts";
 import { readLocal } from "../git.ts";
-import { fetchNetwork, type Network } from "../github.ts";
+import { fetchNetwork, type Network } from "../github-repo.ts";
 import { whichRepo } from "../picking.ts";
 import { sendRepos } from "./github-key.ts";
 
