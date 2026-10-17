@@ -9,13 +9,10 @@ import {
 } from "@elgato/streamdeck";
 
 import { animate, idle, stopAnimating, stopIdling } from "../animate.ts";
-import { onChange, refreshNow, start, stop, store, wantHistory } from "../data.ts";
+import { bottomLine, onChange, refreshNow, start, stop, store, wantHistory } from "../data.ts";
 import { SWAY_MS, TIERS } from "../flames.ts";
 import { drawStreakKey } from "../keys.ts";
 import { type Mode, streaks } from "../streak.ts";
-
-const GREY = "#8b949e";
-const RED = "#f85149";
 
 // The burst is the fire flaring up and throwing sparks. The rest of the
 // time a lit fire sways a little so the key doesn't look frozen. The pictures for
@@ -195,25 +192,12 @@ export class StreakCounter extends SingletonAction<Settings> {
 		// Before the first download there's no streak to show, only a dash
 		// over the cold coal and whatever is going on (loading, or what
 		// went wrong).
-		if (!store.fetchedAt) {
-			return drawStreakKey("–", store.shortMessage ?? "loading", store.message ? RED : GREY, 0);
-		}
+		const line = bottomLine();
+		if (!line.ready) return drawStreakKey("–", line.small, line.color, 0);
 
 		// The tier is how many rows of the table the streak has reached.
 		const days = mode === "weekly" ? current * 7 : current;
 		const tier = TIERS.filter((row) => days >= row.from).length;
-
-		// The bottom line is empty most of the time. It's only there for
-		// the moments something needs saying. If the last try failed, the
-		// words say why in red. The streak and the fire stay either way,
-		// because an old streak beats an empty key.
-		let small = "";
-		let color = GREY;
-		if (store.shortMessage) {
-			small = store.shortMessage;
-			color = RED;
-		}
-		if (store.updating) small = "updating";
 
 		// How far through its burst this key is, from 0 at the start to 1
 		// at the end. It can come out a touch over 1 if a redraw lands after
@@ -229,6 +213,9 @@ export class StreakCounter extends SingletonAction<Settings> {
 		// lands on the right moment of the loop whenever it gets sent.
 		const sway = (now % SWAY_MS) / SWAY_MS;
 
-		return drawStreakKey(String(current), small, color, tier, burst, sway);
+		// The bottom line is empty most of the time. It's only there for the
+		// moments something needs saying. The streak and the fire stay up
+		// through a failed try, because an old streak beats an empty key.
+		return drawStreakKey(String(current), line.small, line.color, tier, burst, sway);
 	}
 }
