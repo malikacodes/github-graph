@@ -21,7 +21,18 @@ let tick: NodeJS.Timeout | undefined;
 let midnight: NodeJS.Timeout | undefined;
 let settled: NodeJS.Timeout | undefined;
 let lastSettings: string | undefined;
-let running = false;
+
+// Jobs run one at a time, in the order they were asked for, so nine keys
+// appearing together don't ask GitHub nine things in the same second.
+// lane is the end of the line: each new piece of work waits for it.
+let lane: Promise<unknown> = Promise.resolve();
+let queued = false;
+
+function inTurn<T>(work: () => Promise<T>): Promise<T> {
+	const next = lane.then(work);
+	lane = next.catch(() => {});
+	return next;
+}
 
 let log = (line: string): void => console.error(line);
 
@@ -44,7 +55,7 @@ export function register(name: string, job: Job): void {
 	const first = jobs.size === 0;
 	jobs.set(name, job);
 	if (first) arm();
-	safely(runOne(name, job), name);
+	safely(inTurn(() => runOne(name, job)), name);
 }
 
 // The last job to leave stops the clock, so nothing ticks for keys that
@@ -135,20 +146,19 @@ async function runOne(name: string, job: Job): Promise<boolean> {
 	}
 }
 
-// Every job in turn, one at a time, so nine keys don't ask GitHub nine
-// things in the same second. A beat that lands while the last one is still
-// going is skipped: the running one is already fetching the newest numbers.
-async function runAll(): Promise<boolean> {
-	if (running) return true;
-	running = true;
-	let allGood = true;
-	try {
+// Every job in turn. A second round asked for while one is still waiting
+// its turn is the same round: the beat, a settings change and waking up
+// can all land in the same second, and one pass covers them.
+function runAll(): Promise<boolean> {
+	if (queued) return Promise.resolve(true);
+	queued = true;
+	return inTurn(async () => {
+		queued = false;
+		let allGood = true;
 		for (const [name, job] of jobs) {
 			if (!(await runOne(name, job))) allGood = false;
 		}
-	} finally {
-		running = false;
-	}
-	if (jobs.size > 0) arm();
-	return allGood;
+		if (jobs.size > 0) arm();
+		return allGood;
+	});
 }

@@ -21,7 +21,7 @@ afterEach(() => {
 });
 
 async function settle(): Promise<void> {
-	for (let i = 0; i < 10; i++) await Promise.resolve();
+	for (let i = 0; i < 40; i++) await Promise.resolve();
 }
 
 // The settings arrive once at the start before anything has changed.
@@ -48,6 +48,24 @@ test("register runs the job now and then once per interval", async () => {
 	mock.timers.tick(5 * MINUTE);
 	await settle();
 	assert.strictEqual(runs, 3);
+});
+
+// Protects GitHub from a burst: nine kinds of key appear in the same
+// moment when a page opens, and their first refreshes go one after the
+// other, not all at once.
+test("jobs that register together run one at a time, in order", async () => {
+	const order: string[] = [];
+	const job = (name: string) => async () => {
+		order.push(`${name} starts`);
+		await Promise.resolve();
+		order.push(`${name} ends`);
+	};
+	startWith("30");
+	register("a", job("a"));
+	register("b", job("b"));
+	register("c", job("c"));
+	await settle();
+	assert.deepStrictEqual(order, ["a starts", "a ends", "b starts", "b ends", "c starts", "c ends"]);
 });
 
 // Protects the token box: it saves while I'm still pasting, so the clock
