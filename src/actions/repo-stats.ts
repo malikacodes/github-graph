@@ -1,6 +1,6 @@
 import { action } from "@elgato/streamdeck";
 
-import { fetchStats, type Stats } from "../github.ts";
+import { fetchStats, type Stats } from "../github-repo.ts";
 import { COLORS, type Face } from "../key-art.ts";
 import { statOf, statsLesson } from "../learn.ts";
 import { GitHubKey, type KeySettings } from "./github-key.ts";

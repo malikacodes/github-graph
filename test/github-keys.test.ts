@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import { safe } from "../src/draw.ts";
 import { ask, rest } from "../src/github.ts";
-import { fetchAlerts, fetchCommitWeeks, fetchRelease, pile } from "../src/github.ts";
+import { fetchAlerts, fetchCommitWeeks, fetchRelease, pile } from "../src/github-repo.ts";
 import { drawGithubKey, weekBars } from "../src/key-art.ts";
 import { alertsLesson, alertWords, compareLesson, issueLesson, pullLesson, releaseLesson, runLesson, statOf } from "../src/learn.ts";
 import { ago, pickBranches, stepRepo, whichRepo } from "../src/picking.ts";

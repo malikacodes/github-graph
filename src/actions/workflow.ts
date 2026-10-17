@@ -1,6 +1,6 @@
 import { action } from "@elgato/streamdeck";
 
-import { fetchLatestRun, type Run } from "../github.ts";
+import { fetchLatestRun, type Run } from "../github-repo.ts";
 import { COLORS, type Face } from "../key-art.ts";
 import { outcome, runLesson } from "../learn.ts";
 import { ago } from "../picking.ts";

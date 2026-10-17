@@ -1,6 +1,6 @@
 import { action } from "@elgato/streamdeck";
 
-import { type Counts, fetchIssueCounts } from "../github.ts";
+import { type Counts, fetchIssueCounts } from "../github-repo.ts";
 import { COLORS, type Face } from "../key-art.ts";
 import { issueLesson } from "../learn.ts";
 import { GitHubKey } from "./github-key.ts";
