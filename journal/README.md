@@ -21,3 +21,4 @@ and how I fixed it.
 | 13 | 2026-10-17 | [One clock](13-one-clock.md) |
 | 14 | 2026-10-17 | [The same three words](14-the-same-three-words.md) |
 | 15 | 2026-10-17 | [Honest Projects](15-honest-projects.md) |
+| 16 | 2026-10-17 | [The last three voids](16-the-last-three-voids.md) |
