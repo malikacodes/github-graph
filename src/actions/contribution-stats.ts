@@ -6,9 +6,12 @@ import {
 	type WillDisappearEvent,
 } from "@elgato/streamdeck";
 
-import { onChange, refreshNow, start, stop, store } from "../data.ts";
+import { bottomLine, onChange, refreshNow, start, stop, store } from "../data.ts";
 import { drawStatsKey } from "../keys.ts";
+import { ago } from "../picking.ts";
 
+// The dot's colors. The dot is this key's own way of saying how fresh the
+// number is, so its red is separate from the red the words come in.
 const GREEN = "#39d353";
 const AMBER = "#d29922";
 const RED = "#f85149";
@@ -85,27 +88,19 @@ export class ContributionStats extends SingletonAction {
 
 	private draw(): string {
 		// Before the first download there's no number to show, only a dash
-		// and whatever is going on (loading, or what went wrong).
-		if (!store.fetchedAt) {
-			return drawStatsKey("", "–", store.message ? RED : AMBER, store.shortMessage ?? "loading");
-		}
+		// and whatever is going on (loading, or what went wrong). The dot
+		// is amber while loading, since nothing is fresh yet.
+		const line = bottomLine();
+		if (!line.ready) return drawStatsKey("", "–", store.message ? RED : AMBER, line.small);
 
-		const minutes = Math.floor((Date.now() - store.fetchedAt) / 60000);
-		let age = "just now";
-		if (minutes >= 60 * 24) age = `${Math.floor(minutes / 60 / 24)} d ago`;
-		else if (minutes >= 60) age = `${Math.floor(minutes / 60)} hr ago`;
-		else if (minutes >= 1) age = `${minutes} min ago`;
-
-		// Green means the timer is keeping up. Amber means the data is more
+		// Green means the clock is keeping up. Amber means the data is more
 		// than two refreshes old, which usually means the Mac was asleep.
 		// Red means the last try failed, and the words say why. The number
 		// stays either way, because an old total beats an empty key.
-		let dot = minutes > store.refreshMinutes * 2 ? AMBER : GREEN;
-		if (store.message) {
-			dot = RED;
-			age = store.shortMessage ?? age;
-		}
-		if (store.updating) age = "updating";
+		const now = Date.now();
+		const minutes = Math.floor((now - store.fetchedAt) / 60000);
+		const dot = store.message ? RED : minutes > store.refreshMinutes * 2 ? AMBER : GREEN;
+		const age = line.small || ago(new Date(store.fetchedAt).toISOString(), now);
 
 		return drawStatsKey(String(store.year), store.total.toLocaleString("en-US"), dot, age);
 	}
