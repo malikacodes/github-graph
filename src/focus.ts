@@ -2,6 +2,7 @@ import streamDeck from "@elgato/streamdeck";
 
 import { type GlobalSettings, store } from "./data.ts";
 import { fetchLogin, fetchRepos, type RepoListing, type Result } from "./github.ts";
+import { onSettingsChange } from "./refresh.ts";
 
 // The repo every GitHub key follows, plus the list the Repo key steps
 // through. Like data.ts, it's one shared whiteboard: the Repo key writes
@@ -57,11 +58,13 @@ export async function repoList(): Promise<Result<RepoListing[]>> {
 }
 
 // A new token can belong to someone else, or see repos the old one
-// couldn't, so the username and the repo list are asked for again.
+// couldn't, so the username and the repo list are asked for again. The
+// clock calls this once per real settings change, before any key refreshes.
 export function forget(): void {
 	login = "";
 	listing = undefined;
 }
+onSettingsChange(forget);
 
 // Whether a repo is private, if the list knows it.
 export function isPrivate(name: string): boolean {
