@@ -5,13 +5,14 @@ import streamDeck, {
 	type SendToPluginEvent,
 	SingletonAction,
 	type WillAppearEvent,
+	type WillDisappearEvent,
 } from "@elgato/streamdeck";
 
-import type { GlobalSettings } from "../data.ts";
-import { focus, forget, isPrivate, onFocus, repoList, setFocus } from "../focus.ts";
+import { focus, isPrivate, onFocus, repoList, setFocus } from "../focus.ts";
 import { COLORS, drawGithubKey } from "../key-art.ts";
 import { repoLesson } from "../learn.ts";
 import { stepRepo } from "../picking.ts";
+import { register, safely, unregister } from "../refresh.ts";
 import { type KeySettings, sendRepos } from "./github-key.ts";
 
 // The Repo key: it shows the repo every GitHub key follows, and a press
@@ -27,29 +28,13 @@ export class RepoKey extends SingletonAction<KeySettings> {
 	// missing token says so instead of "loading" forever.
 	private problem?: string;
 
-	private lastToken?: string;
-	private settled?: NodeJS.Timeout;
+	// The Repo keys showing right now, by id. The first one puts the list's
+	// reload on the shared clock, which also runs it after a new token.
+	private showing = new Set<string>();
 
 	constructor() {
 		super();
-		onFocus(() => void this.saveAndShow());
-
-		// A new token can see repos the old one couldn't (or any at all, the
-		// first time), so the list is asked for again. Same one second wait
-		// as everywhere else, since the token box saves while I paste.
-		streamDeck.settings.onDidReceiveGlobalSettings<GlobalSettings>((ev) => {
-			const now = ev.settings.token ?? "";
-			const first = this.lastToken === undefined;
-			if (now === this.lastToken) return;
-			this.lastToken = now;
-			if (first) return;
-
-			clearTimeout(this.settled);
-			this.settled = setTimeout(() => {
-				forget();
-				void this.load();
-			}, 1000);
-		});
+		onFocus(() => safely(this.saveAndShow(), "repo key"));
 	}
 
 	override async onWillAppear(ev: WillAppearEvent<KeySettings>): Promise<void> {
@@ -59,7 +44,15 @@ export class RepoKey extends SingletonAction<KeySettings> {
 		// saved pick. With nothing saved, it's the repo I pushed to last.
 		if (!focus.repo && ev.payload.settings.repo) setFocus(ev.payload.settings.repo);
 		await this.show(ev.action);
-		await this.load();
+
+		this.showing.add(ev.action.id);
+		if (this.showing.size === 1) register("repo list", () => this.load());
+		else await this.load();
+	}
+
+	override onWillDisappear(ev: WillDisappearEvent<KeySettings>): void {
+		this.showing.delete(ev.action.id);
+		if (this.showing.size === 0) unregister("repo list");
 	}
 
 	// Gets the repo list, and picks the newest repo if nothing is picked yet.
