@@ -12,37 +12,6 @@ export type Day = {
 // detail is GitHub's own reason, when it gave one, for the log only.
 export type Result<T> = { ok: true; data: T } | { ok: false; message: string; short: string; detail?: string };
 
-// GitHub already sorts each day into one of five buckets, the same ones it
-// uses to pick the greens on a profile page, so I don't have to work out the
-// shading from raw counts.
-const LEVELS: Record<string, number> = {
-	NONE: 0,
-	FIRST_QUARTILE: 1,
-	SECOND_QUARTILE: 2,
-	THIRD_QUARTILE: 3,
-	FOURTH_QUARTILE: 4,
-};
-
-const DAYS = "contributionCalendar { weeks { contributionDays { date contributionCount contributionLevel } } }";
-
-type Calendar = {
-	contributionCalendar: {
-		weeks: { contributionDays: { date: string; contributionCount: number; contributionLevel: string }[] }[];
-	};
-};
-
-// GitHub sends days grouped into weeks. The plugin does its own grouping
-// later (see calendar.ts), so this unpacks them into one flat list.
-function flatten(calendar: Calendar): Day[] {
-	return calendar.contributionCalendar.weeks.flatMap((week) =>
-		week.contributionDays.map((day) => ({
-			date: day.date,
-			count: day.contributionCount,
-			level: LEVELS[day.contributionLevel] ?? 0,
-		})),
-	);
-}
-
 // Sends one question to GitHub and sorts out the ways it can go wrong.
 // "viewer" in the queries means whoever owns the token, which is why
 // there's no username setting.
@@ -88,6 +57,71 @@ export async function ask<T>(token: string | undefined, query: string, variables
 	}
 
 	return { ok: true, data: body.data };
+}
+
+// The REST door, for what GraphQL can't answer (Actions, compares,
+// releases, Dependabot). A public repo answers these with any token, or
+// none. path is everything after "/repos/".
+export async function rest<T>(token: string | undefined, path: string): Promise<Result<T>> {
+	let response: Response;
+	try {
+		response = await fetch(`https://api.github.com/repos/${path}`, {
+			headers: {
+				...(token ? { Authorization: `Bearer ${token}` } : {}),
+				Accept: "application/vnd.github+json",
+				"User-Agent": "github-graph-stream-deck",
+			},
+		});
+	} catch {
+		return { ok: false, message: "No internet", short: "Offline" };
+	}
+	if (response.status === 401) return { ok: false, message: "Token didn't work", short: "Bad token" };
+	if (response.status === 404) return { ok: false, message: "Repo not found", short: "No repo" };
+	if (!response.ok) {
+		// GitHub's own reason, for the log and for keys that need to tell two
+		// errors with the same number apart.
+		const detail = await response
+			.json()
+			.then((body) => (body as { message?: string }).message)
+			.catch(() => undefined);
+		return { ok: false, message: `GitHub error ${response.status}`, short: `Error ${response.status}`, detail };
+	}
+	// 204 means "nothing to send", like the weekly commits of an empty repo.
+	if (response.status === 204) return { ok: true, data: null as T };
+	const body = await response.json().catch(() => undefined);
+	if (body === undefined) return { ok: false, message: "GitHub's answer didn't make sense", short: "Odd reply" };
+	return { ok: true, data: body as T };
+}
+
+// GitHub already sorts each day into one of five buckets, the same ones it
+// uses to pick the greens on a profile page, so I don't have to work out the
+// shading from raw counts.
+const LEVELS: Record<string, number> = {
+	NONE: 0,
+	FIRST_QUARTILE: 1,
+	SECOND_QUARTILE: 2,
+	THIRD_QUARTILE: 3,
+	FOURTH_QUARTILE: 4,
+};
+
+const DAYS = "contributionCalendar { weeks { contributionDays { date contributionCount contributionLevel } } }";
+
+type Calendar = {
+	contributionCalendar: {
+		weeks: { contributionDays: { date: string; contributionCount: number; contributionLevel: string }[] }[];
+	};
+};
+
+// GitHub sends days grouped into weeks. The plugin does its own grouping
+// later (see calendar.ts), so this unpacks them into one flat list.
+function flatten(calendar: Calendar): Day[] {
+	return calendar.contributionCalendar.weeks.flatMap((week) =>
+		week.contributionDays.map((day) => ({
+			date: day.date,
+			count: day.contributionCount,
+			level: LEVELS[day.contributionLevel] ?? 0,
+		})),
+	);
 }
 
 export type Recent = {
@@ -391,37 +425,6 @@ export type Run = {
 	at?: string; // when it last changed
 	url?: string;
 };
-
-export async function rest<T>(token: string | undefined, path: string): Promise<Result<T>> {
-	let response: Response;
-	try {
-		response = await fetch(`https://api.github.com/repos/${path}`, {
-			headers: {
-				...(token ? { Authorization: `Bearer ${token}` } : {}),
-				Accept: "application/vnd.github+json",
-				"User-Agent": "github-graph-stream-deck",
-			},
-		});
-	} catch {
-		return { ok: false, message: "No internet", short: "Offline" };
-	}
-	if (response.status === 401) return { ok: false, message: "Token didn't work", short: "Bad token" };
-	if (response.status === 404) return { ok: false, message: "Repo not found", short: "No repo" };
-	if (!response.ok) {
-		// GitHub's own reason, for the log and for keys that need to tell two
-		// errors with the same number apart.
-		const detail = await response
-			.json()
-			.then((body) => (body as { message?: string }).message)
-			.catch(() => undefined);
-		return { ok: false, message: `GitHub error ${response.status}`, short: `Error ${response.status}`, detail };
-	}
-	// 204 means "nothing to send", like the weekly commits of an empty repo.
-	if (response.status === 204) return { ok: true, data: null as T };
-	const body = await response.json().catch(() => undefined);
-	if (body === undefined) return { ok: false, message: "GitHub's answer didn't make sense", short: "Odd reply" };
-	return { ok: true, data: body as T };
-}
 
 export async function fetchLatestRun(token: string | undefined, owner: string, name: string): Promise<Result<Run>> {
 	const repo = `${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
