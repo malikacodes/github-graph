@@ -17,11 +17,14 @@ beforeEach(() => {
 
 afterEach(() => {
 	mock.timers.reset();
-	for (const name of ["a", "b", "c"]) unregister(name);
+	for (const name of ["a", "b", "c", "thrower"]) unregister(name);
 });
 
 async function settle(): Promise<void> {
-	for (let i = 0; i < 40; i++) await Promise.resolve();
+	// setImmediate isn't on the pretend clock, so one real turn of it lets
+	// every promise that's ready finish, however many awaits a job has.
+	await new Promise((done) => setImmediate(done));
+	await new Promise((done) => setImmediate(done));
 }
 
 // The settings arrive once at the start before anything has changed.
@@ -113,18 +116,56 @@ test("an echo of the same settings does nothing", async () => {
 });
 
 // Protects the "nothing on screen, nothing running" rule: once the last
-// job is gone there is no timer left to fire.
+// job is gone its countdown is really gone. A job that comes back starts
+// a fresh one, and the old one must not fire early on top of it.
 test("the last unregister stops the clock", async () => {
 	let runs = 0;
 	startWith("5");
 	register("a", async () => void runs++);
-	register("b", async () => void runs++);
 	await settle();
+	mock.timers.tick(3 * MINUTE);
 	unregister("a");
-	unregister("b");
-	mock.timers.tick(24 * 60 * MINUTE);
+	// Coming back is like starting over: the job's first refresh reads the
+	// settings again, which is what sets its beat.
+	register("a", async () => void runs++);
+	startWith("5");
 	await settle();
 	assert.strictEqual(runs, 2);
+	mock.timers.tick(3 * MINUTE);
+	await settle();
+	assert.strictEqual(runs, 2);
+	mock.timers.tick(2 * MINUTE);
+	await settle();
+	assert.strictEqual(runs, 3);
+});
+
+// Protects the refresh time I picked: the settings arrive a moment after
+// the first key registers (its first refresh reads them), and the first
+// beat has to use them, not the default.
+test("settings that arrive after the first job set its first beat", async () => {
+	let runs = 0;
+	register("a", async () => void runs++);
+	await settle();
+	startWith("5");
+	mock.timers.tick(5 * MINUTE);
+	await settle();
+	assert.strictEqual(runs, 2);
+});
+
+// Protects a token pasted while a page with no keys is open: the clock
+// has nothing to run, but whoever cached the old token's owner still has
+// to forget it.
+test("a settings change still resets when the last job left during the settle", async () => {
+	let resets = 0;
+	startWith("30");
+	onSettingsChange(() => resets++);
+	register("a", async () => {});
+	await settle();
+	settingsChanged({ token: "new", refreshMinutes: "30" });
+	unregister("a");
+	mock.timers.tick(1000);
+	await settle();
+	assert.strictEqual(resets, 1);
 });
 
 // Protects the other keys from one bad job: a job that throws is written
@@ -132,7 +173,7 @@ test("the last unregister stops the clock", async () => {
 test("a job that throws is logged and the others still run", async () => {
 	let ran = "";
 	startWith("5");
-	register("a", async () => {
+	register("thrower", async () => {
 		throw new Error("boom");
 	});
 	register("b", async () => void (ran += "b"));
@@ -140,7 +181,7 @@ test("a job that throws is logged and the others still run", async () => {
 	mock.timers.tick(5 * MINUTE);
 	await settle();
 	assert.strictEqual(ran, "bb");
-	assert.ok(logged.some((line) => line.includes("a") && line.includes("boom")));
+	assert.ok(logged.some((line) => line.includes("thrower") && line.includes("boom")));
 });
 
 // Protects the morning after: the Mac wakes up, waits for the wifi, then

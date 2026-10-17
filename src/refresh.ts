@@ -26,7 +26,7 @@ let lastSettings: string | undefined;
 // appearing together don't ask GitHub nine things in the same second.
 // lane is the end of the line: each new piece of work waits for it.
 let lane: Promise<unknown> = Promise.resolve();
-let queued = false;
+let round: Promise<boolean> | undefined;
 
 function inTurn<T>(work: () => Promise<T>): Promise<T> {
 	const next = lane.then(work);
@@ -61,15 +61,17 @@ export function register(name: string, job: Job): void {
 // The last job to leave stops the clock, so nothing ticks for keys that
 // aren't on screen. It forgets the settings it saw too: the next key to
 // show up runs its job on arrival anyway, so there's nothing to compare
-// against until the settings change again.
+// against until the settings change again. A settle already under way
+// is left to finish, because the listeners still have to forget the old
+// token even with no job to run afterwards.
 export function unregister(name: string): void {
 	jobs.delete(name);
 	if (jobs.size > 0) return;
 	clearTimeout(tick);
 	clearTimeout(midnight);
-	clearTimeout(settled);
-	tick = midnight = settled = undefined;
+	tick = midnight = undefined;
 	lastSettings = undefined;
+	minutes = DEFAULT_MINUTES;
 }
 
 // Called before the jobs after a real settings change. A new token can
@@ -91,7 +93,14 @@ export function settingsChanged(settings: { token?: string; refreshMinutes?: str
 	const first = lastSettings === undefined;
 	lastSettings = now;
 	minutes = Number(settings.refreshMinutes) || DEFAULT_MINUTES;
-	if (first) return;
+
+	// The first arrival comes a moment after the first job registered (its
+	// first refresh reads the settings), so the countdown that job started
+	// with the default is set again with the real number.
+	if (first) {
+		if (tick) arm();
+		return;
+	}
 
 	clearTimeout(settled);
 	settled = setTimeout(() => {
@@ -148,12 +157,12 @@ async function runOne(name: string, job: Job): Promise<boolean> {
 
 // Every job in turn. A second round asked for while one is still waiting
 // its turn is the same round: the beat, a settings change and waking up
-// can all land in the same second, and one pass covers them.
+// can all land in the same second, and one pass covers them. Whoever asked
+// gets that round's answer, so a wake-up still knows whether to try again.
 function runAll(): Promise<boolean> {
-	if (queued) return Promise.resolve(true);
-	queued = true;
-	return inTurn(async () => {
-		queued = false;
+	if (round) return round;
+	const pending = inTurn(async () => {
+		round = undefined;
 		let allGood = true;
 		for (const [name, job] of jobs) {
 			if (!(await runOne(name, job))) allGood = false;
@@ -161,4 +170,6 @@ function runAll(): Promise<boolean> {
 		if (jobs.size > 0) arm();
 		return allGood;
 	});
+	round = pending;
+	return pending;
 }
