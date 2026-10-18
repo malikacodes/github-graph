@@ -2,6 +2,7 @@ import streamDeck, { action, DeviceType, type KeyAction, type KeyDownEvent, Sing
 
 import { focus, onFocus } from "../focus.ts";
 import { COLORS, drawGithubKey } from "../key-art.ts";
+import { safely } from "../refresh.ts";
 
 // The GitHub profiles this plugin ships, one per deck. A plugin can only
 // switch to profiles it ships itself, so these are bundled in the plugin
@@ -17,7 +18,7 @@ const PROFILES: Partial<Record<DeviceType, string>> = {
 export class OpenGitHub extends SingletonAction {
 	constructor() {
 		super();
-		onFocus(() => void this.showAll());
+		onFocus(() => safely(this.showAll(), "deck keys"));
 	}
 
 	override async onWillAppear(ev: WillAppearEvent): Promise<void> {
@@ -54,9 +55,9 @@ export class OpenGitHub extends SingletonAction {
 export class GoToPlus extends SingletonAction {
 	constructor() {
 		super();
-		onFocus(() => void this.showAll());
-		streamDeck.devices.onDeviceDidConnect(() => void this.showAll());
-		streamDeck.devices.onDeviceDidDisconnect(() => void this.showAll());
+		onFocus(() => safely(this.showAll(), "deck keys"));
+		streamDeck.devices.onDeviceDidConnect(() => safely(this.showAll(), "deck keys"));
+		streamDeck.devices.onDeviceDidDisconnect(() => safely(this.showAll(), "deck keys"));
 	}
 
 	override async onWillAppear(ev: WillAppearEvent): Promise<void> {

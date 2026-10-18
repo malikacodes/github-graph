@@ -12,6 +12,7 @@ import { animate, idle, stopAnimating, stopIdling } from "../animate.ts";
 import { bottomLine, onChange, refreshNow, start, stop, store, wantHistory } from "../data.ts";
 import { SWAY_MS, TIERS } from "../flames.ts";
 import { drawStreakKey } from "../keys.ts";
+import { safely } from "../refresh.ts";
 import { type Mode, streaks } from "../streak.ts";
 
 // The burst is the fire flaring up and throwing sparks. The rest of the
@@ -136,7 +137,7 @@ export class StreakCounter extends SingletonAction<Settings> {
 		// redraw, which is what takes a key out when its streak drops to 0
 		// or a burst starts, and puts it back when the burst is over. A
 		// cold coal has nothing to sway.
-		if (current > 0 && !this.flared.has(key.id)) idle(key.id, () => void this.show(key));
+		if (current > 0 && !this.flared.has(key.id)) idle(key.id, () => safely(this.show(key), "streak"));
 		else stopIdling(key.id);
 
 		// Everything above and the two map lines below happen in one go,
@@ -169,7 +170,7 @@ export class StreakCounter extends SingletonAction<Settings> {
 			this.flared.delete(key.id);
 			stopAnimating(key.id);
 		}
-		void this.show(key);
+		safely(this.show(key), "streak");
 	}
 
 	// The settings page shows Daily and 1 before anything is picked, but it

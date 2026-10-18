@@ -11,6 +11,7 @@ import {
 import { animate, stopAnimating } from "../animate.ts";
 import { bottomLine, onChange, refreshNow, start, stop, store } from "../data.ts";
 import { drawGoalKey } from "../keys.ts";
+import { safely } from "../refresh.ts";
 
 // How long the celebration lasts. The pictures that make it up are sent
 // through animate.ts, which is what keeps the whole plugin inside Elgato's
@@ -165,7 +166,7 @@ export class DailyGoal extends SingletonAction<Settings> {
 			this.started.delete(key.id);
 			stopAnimating(key.id);
 		}
-		void this.show(key);
+		safely(this.show(key), "goal");
 	}
 
 	// The settings page shows 1 before anything is picked, but it doesn't

@@ -1,7 +1,7 @@
 import assert from "node:assert";
 import { afterEach, beforeEach, mock, test } from "node:test";
 
-import { logWith, onSettingsChange, register, settingsChanged, unregister, wokeUp } from "../src/refresh.ts";
+import { logWith, onSettingsChange, register, safely, settingsChanged, unregister, wokeUp } from "../src/refresh.ts";
 
 // The clock is all timers, so these tests run on a pretend clock: tick()
 // moves it forward and nothing really waits. A job that resolves still
@@ -182,6 +182,15 @@ test("a job that throws is logged and the others still run", async () => {
 	await settle();
 	assert.strictEqual(ran, "bb");
 	assert.ok(logged.some((line) => line.includes("thrower") && line.includes("boom")));
+});
+
+// Protects the plugin from a key's own background work: a promise that
+// fails is written to the log under the name it was given, and nothing
+// is thrown, so Node never sees an error nobody caught and never quits.
+test("safely logs a failure with its name and never throws", async () => {
+	assert.doesNotThrow(() => safely(Promise.reject(new Error("boom")), "goal"));
+	await settle();
+	assert.deepStrictEqual(logged, ["goal failed: Error: boom"]);
 });
 
 // Protects the morning after: the Mac wakes up, waits for the wifi, then
