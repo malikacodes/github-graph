@@ -9,11 +9,8 @@ import {
 } from "@elgato/streamdeck";
 
 import { animate, stopAnimating } from "../animate.ts";
-import { onChange, refreshNow, start, stop, store } from "../data.ts";
+import { bottomLine, onChange, refreshNow, start, stop, store } from "../data.ts";
 import { drawGoalKey } from "../keys.ts";
-
-const GREY = "#8b949e";
-const RED = "#f85149";
 
 // How long the celebration lasts. The pictures that make it up are sent
 // through animate.ts, which is what keeps the whole plugin inside Elgato's
@@ -184,22 +181,12 @@ export class DailyGoal extends SingletonAction<Settings> {
 	private draw(goal: number, count: number, began: number | undefined): string {
 		// Before the first download there's no count to show, only a dash
 		// and whatever is going on (loading, or what went wrong).
-		if (!store.fetchedAt) {
-			return drawGoalKey("–", store.shortMessage ?? "loading", store.message ? RED : GREY, 0, false);
-		}
+		const line = bottomLine();
+		if (!line.ready) return drawGoalKey("–", line.small, line.color, 0, false);
 
 		// If the last try failed, the words say why in red. The count and
 		// the ring stay either way, because an old count beats an empty key.
-		let small = `of ${goal}`;
-		let color = GREY;
-		if (store.shortMessage) {
-			small = store.shortMessage;
-			color = RED;
-		}
-		if (store.updating) {
-			small = "updating";
-			color = GREY;
-		}
+		const small = line.small || `of ${goal}`;
 
 		// How far through the celebration this key is, from 0 at the start
 		// to 1 at the end. It can come out a touch over 1 if a redraw
@@ -210,6 +197,6 @@ export class DailyGoal extends SingletonAction<Settings> {
 
 		// Past the goal the ring just stays full, and the count keeps going.
 		// The star is there for as long as today's count is at the goal.
-		return drawGoalKey(String(count), small, color, Math.min(1, count / goal), count >= goal, burst);
+		return drawGoalKey(String(count), small, line.color, Math.min(1, count / goal), count >= goal, burst);
 	}
 }

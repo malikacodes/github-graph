@@ -153,6 +153,30 @@ export function status({ updating, message, fetchedAt }: Pick<typeof store, "upd
 	return `Up to date. Last checked ${time}.`;
 }
 
+// The colors the contribution keys write their bottom line in.
+const GREY = "#8b949e";
+const RED = "#f85149";
+
+// The few words along the bottom of the stats, goal and streak keys, and
+// the color to write them in. small is empty when there's nothing to say,
+// so each key can put its own everyday line there ("of 5", the age of the
+// numbers). ready says whether there are numbers to show at all: before
+// the first download the keys draw a dash instead. The whiteboard is
+// passed in so the tests can hand over a made-up one.
+export function bottomLine({
+	updating,
+	message,
+	shortMessage,
+	fetchedAt,
+}: Pick<typeof store, "updating" | "message" | "shortMessage" | "fetchedAt"> = store): { small: string; color: string; ready: boolean } {
+	// Before the first download a press has nothing to update yet, so the
+	// line stays on loading (or on what went wrong) until numbers arrive.
+	if (!fetchedAt) return { small: shortMessage ?? "loading", color: message ? RED : GREY, ready: false };
+	if (updating) return { small: "updating", color: GREY, ready: true };
+	if (message) return { small: shortMessage ?? message, color: RED, ready: true };
+	return { small: "", color: GREY, ready: true };
+}
+
 // Downloads the last 12 months again and tells every action to redraw.
 // A refresh that starts while one is still on its way joins it instead
 // of asking GitHub twice: the clock's beat, a press, the settings page and

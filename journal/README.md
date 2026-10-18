@@ -19,3 +19,4 @@ and how I fixed it.
 | 11 | 2026-10-17 | [Three copies of three lines](11-three-copies-of-three-lines.md) |
 | 12 | 2026-10-17 | [One file per audience](12-one-file-per-audience.md) |
 | 13 | 2026-10-17 | [One clock](13-one-clock.md) |
+| 14 | 2026-10-17 | [The same three words](14-the-same-three-words.md) |
