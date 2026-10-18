@@ -83,13 +83,31 @@ only takes the dials I put it on.
 |---|---|
 | ↪️ Turn any of its dials | Picks the next lane, left or right, and wraps around at the ends |
 | 🔘 Press the dial | Refreshes that repo |
-| 👆 Tap any of its dials | Opens the picked lane on GitHub: its pull request if it merged, the branch if it's still open |
+| 👆 Tap any of its dials | Opens the picked lane on GitHub: its pull request if it merged, the branch if it's still open. A branch that's only on my Mac just shows the warning sign, since there's nothing on GitHub to open |
 
 It starts on the newest open branch. It fits two lanes per dial in two
 rows, so it shows the branches still open first and then the newest merged
 ones. This dial has room for words,
 so anything wrong (`Repo not found`, `Add a token in settings`) shows
 right on the strip.
+
+#### Branches that are only on my Mac
+
+![github-graph on the right two dials: a dashed yellow lane for a branch I haven't pushed yet](screenshots/branch-map-local.png)
+
+The plugin runs on my Mac, right next to my repos, so it also asks git.
+For a repo picked from the dropdown, it looks in `~/Projects/<repo name>`,
+and any branch there that GitHub doesn't have gets a dashed lane with
+"only on my Mac" along the bottom. If the branch I have checked out has
+changes I haven't committed, its name gets a `*` and its end dot gets a
+ring. When that's main, the `*` goes on main's label instead.
+
+If there's no folder with that name, or it isn't a git repo, the map is
+just GitHub's, with no message about it. A repo typed as
+`someone/their-repo` never gets looked for locally, since it isn't mine.
+It only reads git, so it never fetches or changes anything in the repo.
+Local branches update when the map refreshes, so after making a branch I
+press the dial to see it right away.
 
 ### 🔢 Contribution Stats
 

@@ -11,3 +11,4 @@ and how I fixed it.
 | 03 | 2026-10-08 | [Less on the dial](03-less-on-the-dial.md) |
 | 04 | 2026-10-12 | [The hole on Mondays](04-the-hole-on-mondays.md) |
 | 05 | 2026-10-15 | [The branch map](05-the-branch-map.md) |
+| 06 | 2026-10-15 | [Only on my Mac](06-only-on-my-mac.md) |

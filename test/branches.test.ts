@@ -1,7 +1,18 @@
 import assert from "node:assert";
 import { test } from "node:test";
 
-import { type Lane, laneLink, lanesFrom, layout, parseRepo, pick, ROWS } from "../src/branches.ts";
+import {
+	type Lane,
+	laneLink,
+	lanesFrom,
+	layout,
+	parseAhead,
+	parseRefs,
+	parseRepo,
+	parseStatus,
+	pick,
+	ROWS,
+} from "../src/branches.ts";
 import { drawBranches } from "../src/draw.ts";
 
 // A repo the way github.ts hands it over, with nothing in it yet.
@@ -39,6 +50,87 @@ test("lanes: a merged branch with new commits shows as open again", () => {
 test("lanes: a branch that isn't ahead of main isn't shown", () => {
 	const lanes = lanesFrom(network({ branches: [{ name: "empty", oid: "ccc", ahead: 0 }] }));
 	assert.deepStrictEqual(lanes, []);
+});
+
+// My Mac's side of a repo, the way git.ts hands it over.
+const mac = (branches: object[], current?: string, dirty = false) => ({ branches, current, dirty }) as never;
+
+// Protects the whole point of the local lanes: a branch I never pushed
+// shows up, and it's marked as local so it gets drawn dashed.
+test("lanes: a branch only on my Mac is an open local lane", () => {
+	const lanes = lanesFrom(
+		network({}),
+		mac([{ name: "try-dashes", oid: "ddd", ahead: 2, firstCommit: "2026-10-15T19:30:11Z" }]),
+	);
+	assert.deepStrictEqual(lanes, [{ name: "try-dashes", start: "2026-10-15T19:30:11Z", local: true }]);
+});
+
+// Protects against every pushed branch showing up twice, once from GitHub
+// and once from my Mac.
+test("lanes: a local branch GitHub also has only shows once, as GitHub's", () => {
+	const lanes = lanesFrom(
+		network({ branches: [{ name: "pushed", oid: "eee", ahead: 1, firstCommit: "2026-10-14T00:00:00Z" }] }),
+		mac([{ name: "pushed", oid: "eee", ahead: 1, firstCommit: "2026-10-14T00:00:00Z" }]),
+	);
+	assert.strictEqual(lanes.length, 1);
+	assert.strictEqual(lanes[0].local, undefined);
+});
+
+// Protects against my old local branches haunting the map. After a squash
+// merge GitHub deletes its copy, mine stays, and git counts it as ahead.
+test("lanes: a local branch still on its merged pull request's commit isn't open", () => {
+	const lanes = lanesFrom(
+		network({ merged: [pr("branch-dial", "fff", "2026-10-15T00:00:00Z", "2026-10-15T01:00:00Z")] }),
+		mac([{ name: "branch-dial", oid: "fff", ahead: 9, firstCommit: "2026-10-15T00:00:00Z" }]),
+	);
+	assert.strictEqual(lanes.filter((lane) => !lane.end).length, 0);
+});
+
+// Protects the uncommitted mark from landing on the wrong lane, or on any
+// lane at all when everything is committed.
+test("lanes: only the checked out branch gets the uncommitted mark, and only when dirty", () => {
+	const branches = [
+		{ name: "a", oid: "1", ahead: 1, firstCommit: "2026-10-14T00:00:00Z" },
+		{ name: "b", oid: "2", ahead: 1, firstCommit: "2026-10-15T00:00:00Z" },
+	];
+	const dirty = lanesFrom(network({}), mac(branches, "b", true));
+	assert.deepStrictEqual(
+		dirty.map((lane) => lane.dirty),
+		[undefined, true],
+	);
+	const clean = lanesFrom(network({}), mac(branches, "b", false));
+	assert.ok(clean.every((lane) => !lane.dirty));
+});
+
+// Protects which refs count as mine and which are origin's, including a
+// name with a "/" in it.
+test("parseRefs: splits my branches from origin's", () => {
+	const { heads, origin } = parseRefs(
+		"refs/heads/main\taaa\nrefs/heads/feature/login\tbbb\nrefs/remotes/origin/HEAD\taaa\nrefs/remotes/origin/main\taaa\n",
+	);
+	assert.deepStrictEqual([...heads], [["main", "aaa"], ["feature/login", "bbb"]]);
+	assert.ok(origin.has("main"));
+	assert.ok(!heads.has("HEAD"));
+});
+
+// Protects the order on the map: git's dates are in my time zone, GitHub's
+// are UTC, and layout compares them as text. Both have to look the same.
+test("parseAhead: counts commits and turns the oldest date into GitHub's format", () => {
+	const ahead = parseAhead("2026-10-15T15:00:00-05:00\n2026-10-15T14:30:11-05:00\n");
+	assert.deepStrictEqual(ahead, { ahead: 2, firstCommit: "2026-10-15T19:30:11Z" });
+	assert.deepStrictEqual(parseAhead(""), { ahead: 0, firstCommit: undefined });
+});
+
+// Protects the checked out branch name in every shape git's status line
+// comes in, and the dirty check.
+test("parseStatus: reads the branch and whether anything is uncommitted", () => {
+	assert.deepStrictEqual(parseStatus("## local-branches...origin/local-branches [ahead 1]\n M src/draw.ts\n"), {
+		current: "local-branches",
+		dirty: true,
+	});
+	assert.deepStrictEqual(parseStatus("## try-dashes\n"), { current: "try-dashes", dirty: false });
+	assert.deepStrictEqual(parseStatus("## No commits yet on main\n?? notes.md\n"), { current: "main", dirty: true });
+	assert.deepStrictEqual(parseStatus("## HEAD (no branch)\n"), { dirty: false });
 });
 
 // Three lanes, at the times given as hours on one day.
@@ -118,6 +210,12 @@ test("laneLink: merged goes to the pull request, open goes to the branch", () =>
 	assert.strictEqual(laneLink("https://github.com/me/repo", open), "https://github.com/me/repo/tree/feature/log%20in");
 });
 
+// Protects the tap on a branch GitHub has never seen from opening a 404.
+test("laneLink: a branch only on my Mac has no link", () => {
+	const [local] = layout([{ ...lane("try-dashes", 1), local: true }], 200);
+	assert.strictEqual(laneLink("https://github.com/me/repo", local), undefined);
+});
+
 // Protects the repo setting from pasted links and leftovers.
 test("parseRepo: takes a name or owner/name, and nothing else", () => {
 	assert.deepStrictEqual(parseRepo("karaoke-maker"), { owner: undefined, name: "karaoke-maker" });
@@ -157,4 +255,15 @@ test("draw: only the picked lane is bright", () => {
 	assert.strictEqual((picture.match(/<g opacity="0.3">/g) ?? []).length, 1);
 	assert.ok(picture.includes(">b</text>"));
 	assert.ok(!picture.includes(">a</text>"));
+});
+
+// Protects telling the two kinds of open lane apart: only my Mac's lanes
+// are dashed, and their line along the bottom says where they live.
+test("draw: a branch only on my Mac is dashed and says so", () => {
+	const placed = layout([lane("pushed", 1), { ...lane("try-dashes", 2), local: true }], 800);
+	const local = placed.findIndex((p) => p.local);
+	const picture = svg(drawBranches(placed, "main", 800, 0, local));
+	assert.strictEqual((picture.match(/stroke-dasharray/g) ?? []).length, 1);
+	assert.ok(picture.includes(">only on my Mac</text>"));
+	assert.ok(!picture.includes(">still open</text>"));
 });
