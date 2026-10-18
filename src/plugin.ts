@@ -3,6 +3,7 @@ import streamDeck from "@elgato/streamdeck";
 import { BranchNetwork } from "./actions/branch-network";
 import { Commits } from "./actions/commits";
 import { Compare } from "./actions/compare";
+import { GoToPlus, OpenGitHub } from "./actions/deck-keys";
 import { ContributionGraph } from "./actions/contribution-graph";
 import { ContributionStats } from "./actions/contribution-stats";
 import { DailyGoal } from "./actions/daily-goal";
@@ -38,6 +39,8 @@ streamDeck.actions.registerAction(new Compare());
 streamDeck.actions.registerAction(new Releases());
 streamDeck.actions.registerAction(new Security());
 streamDeck.actions.registerAction(new Projects());
+streamDeck.actions.registerAction(new OpenGitHub());
+streamDeck.actions.registerAction(new GoToPlus());
 
 // connect() has to come last, after the actions are registered.
 streamDeck.connect();

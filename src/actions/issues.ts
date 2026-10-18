@@ -15,6 +15,9 @@ export class Issues extends GitHubKey<Counts> {
 	}
 
 	protected face(counts: Counts): Face {
+		// Turned off is calm gray, the same as Security's "off": nothing is
+		// wrong, there's just nothing here to count.
+		if (counts.off) return { ...this.look, color: COLORS.gray, big: "off", small: "issues off" };
 		return {
 			...this.look,
 			big: String(counts.open),
@@ -26,7 +29,7 @@ export class Issues extends GitHubKey<Counts> {
 		return issueLesson(repo, counts, message, Date.now());
 	}
 
-	protected link(_: Counts | undefined, __: string, url: string): string {
-		return `${url}/issues`;
+	protected link(counts: Counts | undefined, _: string, url: string): string {
+		return counts?.off ? `${url}/settings` : `${url}/issues`;
 	}
 }

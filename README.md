@@ -19,7 +19,7 @@ and only says something when it can't reach GitHub.
 | 🔢 Contribution Stats | My total for the year, and how fresh the number is | A key |
 | 🎯 Daily Goal | A ring that fills toward my target for today | A key |
 | 🔥 Streak Counter | A fire that grows the longer my streak goes | A key |
-| 🗂️ GitHub keys | One repo at a time: pull requests, issues, workflow runs, stats, commits, branches, releases and security, plus a project board, with a Repo key to switch between repos | Keys, on my XL |
+| 🗂️ GitHub keys | One repo at a time: pull requests, issues, workflow runs, stats, commits, branches, releases and security, plus a project board, with a Repo key to switch between repos | Keys, on my XL and my + |
 
 The contribution ones share one download. GitHub gets asked once, no matter how many of
 them are on screen. Pressing any of them refreshes, and each one shows it
@@ -190,7 +190,7 @@ under it, and a few gray words at the bottom, on plain black.
 |---|---|---|
 | Repo | The repo the other keys follow, with a small lock if it's private | Steps to the next repo, newest push first, and round again |
 | Pull Requests | How many are open | Opens them on GitHub |
-| Issues | How many are open (or how many are closed, when none are open) | Opens them on GitHub |
+| Issues | How many are open (or how many are closed, when none are open, or a calm gray **off** when issues are turned off, like on a fork) | Opens them on GitHub, or the setting to turn them on |
 | Workflow | The latest GitHub Actions run: passed, failed or running | Opens that run on GitHub |
 | Repo Stats | Stars, forks, watchers or the main language, picked under **Show** | Opens that page on GitHub |
 | Commit Activity | A bar for each of the last eight weeks of commits on main | Opens the commit history |
@@ -198,6 +198,8 @@ under it, and a few gray words at the bottom, on plain black.
 | Releases | The newest release and how long ago it came out | Opens the release |
 | Security | Open Dependabot alerts, colored by the worst one, or **off** when Dependabot isn't turned on | Opens the alerts, or the setting to turn them on |
 | Projects | One of my project boards: to do, doing and done | Opens the board |
+| GitHub | A way in, for my Home page | Opens the GitHub page on the deck it's on |
+| Go to + | A way to the + | Opens the + GitHub page, with the Branch Map on the dials |
 
 Every key starts on **Follow the Repo key**, so pressing the Repo key
 switches all of them together. Picking a repo in a key's settings pins
@@ -209,6 +211,14 @@ for the repo. Zero would look like good news when really nothing is
 checking. Projects is the one key that doesn't follow the Repo key: a board
 belongs to me, not to a repo, so its settings pick a board instead (the
 newest one, if nothing's picked). It needs `read:project` on the token.
+
+The plugin ships two ready-made pages (Stream Deck calls them profiles).
+**GitHub XL** has the Repo key, all nine GitHub keys, Go to + and a Home
+key. **GitHub +** has the seven keys I use most, a Home key, and the
+Branch Map on all four dials. Everything on both starts on "Follow the
+Repo key", so pressing Repo on either deck moves everything, dials
+included. The first time a GitHub or Go to + key opens one, Stream Deck
+asks to install it. That only happens once per deck.
 
 Branch Comparison works with nothing set: it compares the newest branch
 with main, on whatever repo the Repo key is on. Its **Base** and
@@ -232,8 +242,13 @@ Stream Deck +.
 npm install                                               # get the SDK and build tools
 npm run build                                             # build the plugin into the .sdPlugin folder
 npx streamdeck dev                                        # turn on developer mode so Stream Deck loads local plugins
+npm run profiles                                          # make the GitHub XL and GitHub + pages (see below)
 npx streamdeck link com.malikacodes.github-graph.sdPlugin # tell Stream Deck where the plugin lives
 ```
+
+`npm run profiles` builds the two GitHub pages from my own Stream Deck
+files, so their Home keys point at my own Home profiles. That's also why
+the built pages aren't in the repo.
 
 Then in the Stream Deck app, find **GitHub Graph** in the action list and
 drag the actions where you want them. For the full-width graph, add a new
@@ -251,9 +266,11 @@ The plugin needs a GitHub token to ask for your contributions.
 
 The Branch Map and the GitHub keys read repos, and `read:user` only covers
 public ones. A private repo is missing from the picker (or shows `Repo not
-found`, if it was picked before) until the token is allowed to read it.
-That's what `repo` is for. It also allows writing, which these keys never
-do, so the token only lives in the Stream Deck app.
+found`, if it was picked before) until the token is allowed to read it,
+which is what `repo` is for. Security needs `repo` even on public repos,
+since Dependabot alerts aren't public, and Projects needs `read:project`.
+`repo` also allows writing, and these keys only ever read, so I keep the
+token in the Stream Deck app and nowhere else.
 
 Every action shares the same token and the same **Refresh Every** setting,
 which starts at 30 minutes. It also refreshes just after midnight, and a
@@ -343,7 +360,7 @@ something like `Up to date. Last checked 2:41 PM.`
   merged pull requests and the first 30 branches.
 - Tests cover the streak math, the Branch Map's sorting and layout, and
   the GitHub keys' drawing, repo picking and settings page sentences
-  (`npm test`, 67 of them). The rest of the drawing I checked by hand on
+  (`npm test`, 71 of them). The rest of the drawing I checked by hand on
   the actual device.
 - A year with 54 week columns (2028 is the next one) gets slightly smaller
   squares on the full-width graph. I can't see that one for real until then.

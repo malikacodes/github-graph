@@ -12,14 +12,18 @@ import streamDeck, {
 } from "@elgato/streamdeck";
 
 import { laneLink, lanesFrom, layout, type Local, parseRepo, pick, type Placed } from "../branches";
-import { type GlobalSettings, store } from "../data";
+import type { GlobalSettings } from "../data";
 import { drawBranches } from "../draw";
+import { focus, forget, onFocus, owner, token as getToken } from "../focus";
 import { readLocal } from "../git";
-import { fetchLogin, fetchNetwork, fetchRepos, type Network } from "../github";
+import { fetchNetwork, type Network } from "../github";
+import { whichRepo } from "../picking";
+import { sendRepos } from "./github-key";
 
-// The repo is the one thing each dial remembers: one of mine, picked from
-// the dropdown, like "karaoke-maker". parseRepo still takes
-// "someone/their-repo" too, for a setting that came from anywhere else.
+// The repo is the one thing each dial remembers: one of mine, picked in
+// the repo picker, like "karaoke-maker". Blank means "follow the Repo key".
+// parseRepo still takes "someone/their-repo" too, for a setting that came
+// from anywhere else.
 type Settings = {
 	repo?: string;
 };
@@ -42,19 +46,18 @@ const DEFAULT_MINUTES = 30;
 // share one picture the way the full-width graph does.
 @action({ UUID: "com.malikacodes.github-graph.branches" })
 export class BranchNetwork extends SingletonAction<Settings> {
-	// Which repo each dial is set to, by the dial's id.
+	// Which repo each dial is showing, and what its setting says (blank for
+	// following the Repo key), both by the dial's id.
 	private repoOf = new Map<string, string>();
+	private pinned = new Map<string, string>();
 
 	// The picked lane's name for each repo. Dials showing the same repo are
 	// one picture, so they share one pick, and turning any of them moves it.
 	private picks = new Map<string, string>();
 
-	// What's known about each repo, by the text in the box. Dials with the
+	// What's known about each repo, by name. Dials with the
 	// same repo share one entry, so GitHub only gets asked once for them.
 	private repos = new Map<string, Repo>();
-
-	// Who owns the token, for repo names typed without an owner.
-	private login = "";
 
 	private nextRefresh: NodeJS.Timeout | undefined;
 	private settingsSettled: NodeJS.Timeout | undefined;
@@ -62,6 +65,13 @@ export class BranchNetwork extends SingletonAction<Settings> {
 
 	constructor() {
 		super();
+
+		// A new repo on the Repo key moves every dial that follows it.
+		onFocus(async () => {
+			for (const [id, setting] of this.pinned) if (!setting) this.setRepo(id, "");
+			await this.showAll();
+			await this.refreshMissing();
+		});
 
 		// A new token or refresh time on the settings page. Same one second
 		// wait as data.ts, since the token box saves while I'm still pasting.
@@ -76,7 +86,7 @@ export class BranchNetwork extends SingletonAction<Settings> {
 
 			clearTimeout(this.settingsSettled);
 			this.settingsSettled = setTimeout(() => {
-				this.login = "";
+				forget();
 				void this.refreshAll();
 			}, 1000);
 		});
@@ -97,10 +107,11 @@ export class BranchNetwork extends SingletonAction<Settings> {
 	// A dial leaving changes how many share a picture, so everyone redraws.
 	override async onWillDisappear(ev: WillDisappearEvent<Settings>): Promise<void> {
 		this.repoOf.delete(ev.action.id);
+		this.pinned.delete(ev.action.id);
 		await this.showAll();
 	}
 
-	// A new repo picked in the dropdown.
+	// A new repo picked in the repo picker.
 	override async onDidReceiveSettings(ev: DidReceiveSettingsEvent<Settings>): Promise<void> {
 		this.setRepo(ev.action.id, ev.payload.settings.repo);
 		await this.showAll();
@@ -121,24 +132,10 @@ export class BranchNetwork extends SingletonAction<Settings> {
 		await this.showAll();
 	}
 
-	// The settings page asks for the repo list when the dropdown opens
-	// (sdpi-components calls this a "datasource"). A repo this dial is set
-	// to that isn't in the list, like a private one the token can't see,
-	// stays in it with a note. Otherwise the dropdown would go blank and
-	// look like I never picked one.
+	// The repo picker on the settings page, the same one the GitHub keys use,
+	// with "Follow the Repo key" at the top.
 	override async onSendToPlugin(ev: SendToPluginEvent<{ event?: string }, Settings>): Promise<void> {
-		if (ev.payload?.event !== "getRepos") return;
-
-		const settings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
-		const result = await fetchRepos(settings.token?.trim());
-		const names = result.ok ? result.data.map((repo) => repo.name) : [];
-		if (!result.ok) streamDeck.logger.warn(`Couldn't list repos: ${result.message}`);
-
-		const items = names.map((name) => ({ value: name, label: name }));
-		const saved = this.repoOf.get(ev.action.id);
-		if (saved && !names.includes(saved)) items.unshift({ value: saved, label: `${saved} (token can't see it)` });
-
-		await streamDeck.ui.sendToPropertyInspector({ event: "getRepos", items });
+		if (ev.payload?.event === "getRepos") await sendRepos(this.pinned.get(ev.action.id) ?? "", true);
 	}
 
 	// Turning steps the pick along the lanes, left to right, and wraps
@@ -170,8 +167,13 @@ export class BranchNetwork extends SingletonAction<Settings> {
 		else await ev.action.showAlert();
 	}
 
+	// A blank setting follows the Repo key, the same as the GitHub keys, so
+	// the dials on my + switch repos along with the XL. repoOf holds the
+	// repo each dial is really showing, and pinned holds what its setting
+	// says, so a new pick on the Repo key can move only the followers.
 	private setRepo(id: string, typed: string | undefined): void {
-		const text = typed?.trim() ?? "";
+		this.pinned.set(id, typed?.trim() ?? "");
+		const text = whichRepo(typed, focus.repo);
 		if (text) this.repoOf.set(id, text);
 		else this.repoOf.delete(id);
 		if (text && !this.repos.has(text)) this.repos.set(text, { busy: false, updating: false });
@@ -208,22 +210,17 @@ export class BranchNetwork extends SingletonAction<Settings> {
 		}
 
 		repo.busy = true;
-		const settings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
-		const token = settings.token?.trim();
+		const token = await getToken();
 
-		// A name with no owner is one of mine. The contribution dials
-		// already know my username if they've loaded, which saves asking.
-		let owner = parsed.owner ?? (this.login || store.login);
-		if (!owner) {
-			const login = await fetchLogin(token);
-			if (login.ok) owner = this.login = login.data;
-			else return this.failed(text, repo, login.message, login.detail);
-		}
+		// A name with no owner is one of mine, looked up the same way the
+		// GitHub keys do it.
+		const login = parsed.owner ? { ok: true as const, data: parsed.owner } : await owner();
+		if (!login.ok) return this.failed(text, repo, login.message, login.detail);
 
-		const result = await fetchNetwork(token, owner, parsed.name);
+		const result = await fetchNetwork(token, login.data, parsed.name);
 		if (!result.ok) return this.failed(text, repo, result.message, result.detail);
 
-		// A repo picked from the dropdown is one of mine, so it might be in
+		// A repo picked in the picker is one of mine, so it might be in
 		// ~/Projects too. One typed as "someone/their-repo" isn't, even if a
 		// folder happens to have the same name.
 		repo.local = parsed.owner ? undefined : await readLocal(parsed.name, result.data.main);
@@ -276,7 +273,7 @@ export class BranchNetwork extends SingletonAction<Settings> {
 	private async show(dial: DialAction<Settings>): Promise<void> {
 		const spot = this.spot(dial);
 		if (!spot) {
-			await dial.setFeedback({ graph: drawBranches([], "", 200, 0, -1, "Pick a repo in settings") });
+			await dial.setFeedback({ graph: drawBranches([], "", 200, 0, -1, "Pick a repo, or press the Repo key") });
 			return;
 		}
 		const { text, slot, width } = spot;

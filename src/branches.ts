@@ -262,7 +262,7 @@ export function laneLink(repoUrl: string, lane: Placed): string | undefined {
 	return `${repoUrl}/tree/${lane.name.split("/").map(encodeURIComponent).join("/")}`;
 }
 
-// Reads a dial's repo setting. The dropdown saves "karaoke-maker" for a
+// Reads a repo setting. The repo picker saves "karaoke-maker" for a
 // repo of mine, and "someone/their-repo" works too. Anything else, like a
 // pasted link, isn't a repo.
 export function parseRepo(text: string | undefined): { owner?: string; name: string } | undefined {

@@ -15,3 +15,4 @@ and how I fixed it.
 | 07 | 2026-10-15 | [Keys that teach me GitHub](07-keys-that-teach.md) |
 | 08 | 2026-10-15 | [Stars, commits and branches](08-stats-commits-branches.md) |
 | 09 | 2026-10-15 | [Off isn't the same as safe](09-releases-security-projects.md) |
+| 10 | 2026-10-15 | [Two decks, one repo](10-two-decks-one-repo.md) |

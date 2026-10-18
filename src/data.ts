@@ -85,8 +85,8 @@ export function start(): void {
 
 	// A settings page asks for the status when it opens (see ui/status.js).
 	// After that, changed() keeps it up to date for as long as it's open.
-	// Only that exact question gets an answer, since the Branch Map's
-	// dropdown sends its own question through the same door.
+	// Only that exact question gets an answer, since the repo pickers
+	// send their own questions through the same door.
 	streamDeck.ui.onSendToPlugin((ev) => {
 		if (ev.payload !== "status") return;
 		void streamDeck.ui.sendToPropertyInspector(status());

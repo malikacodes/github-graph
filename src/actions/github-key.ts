@@ -10,7 +10,7 @@ import streamDeck, {
 
 import { parseRepo } from "../branches";
 import type { GlobalSettings } from "../data";
-import { focus, isPrivate, onFocus, owner, repoList, token } from "../focus";
+import { focus, forget, isPrivate, onFocus, owner, repoList, token } from "../focus";
 import type { Result } from "../github";
 import type { Face } from "../key-art";
 import { drawGithubKey } from "../key-art";
@@ -41,7 +41,7 @@ type Known<T> = {
 
 const DEFAULT_MINUTES = 30;
 
-// Each kind of key waits a few seconds longer than the last before its
+// Each kind of key waits two seconds longer than the last before its
 // first refresh, so a page of nine keys doesn't ask GitHub nine things in
 // the same second. GitHub has a separate limit for bursts like that.
 let nextStagger = 0;
@@ -68,29 +68,47 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 	// The drawing and color this key uses while loading or when it's stuck.
 	protected abstract readonly look: Pick<Face, "icon" | "color">;
 
+	// Whether this kind of key follows the Repo key. Projects doesn't: a
+	// board belongs to me, not to a repo, so it never needs my username
+	// either.
+	protected readonly follows: boolean = true;
+
 	private settings = new Map<string, KeySettings>();
 	private known = new Map<string, Known<T>>();
 	private timer?: NodeJS.Timeout;
-	private stagger = (nextStagger++ % 9) * 4000;
+	private stagger = (nextStagger++ % 9) * 2000;
 	private lastGlobal = "";
+	private settled?: NodeJS.Timeout;
 
 	constructor() {
 		super();
-		onFocus(() => void this.followed());
+		onFocus(() => this.safely(this.followed()));
 
-		// Same rule as the Branch Map: only a real change to the token or
+		// Same rules as the Branch Map. Only a real change to the token or
 		// the timer counts, or an echo of the same settings would set off a
-		// refresh that reads them, which echoes them again.
+		// refresh that reads them, which echoes them again. And it waits a
+		// second, because the token box saves while I'm still pasting.
 		streamDeck.settings.onDidReceiveGlobalSettings<GlobalSettings>((ev) => {
 			const now = `${ev.settings.token ?? ""}|${ev.settings.refreshMinutes ?? ""}`;
 			if (now === this.lastGlobal) return;
 			const first = this.lastGlobal === "";
 			this.lastGlobal = now;
-			if (!first) {
+			if (first) return;
+
+			clearTimeout(this.settled);
+			this.settled = setTimeout(() => {
+				forget();
 				this.known.clear();
-				void this.refreshAll();
-			}
+				this.safely(this.refreshAll());
+			}, 1000);
 		});
+	}
+
+	// Runs something in the background and writes any error to the log.
+	// Without this, one unexpected error from a timer would stop the whole
+	// plugin, since Node quits on an error nobody catches.
+	private safely(work: Promise<void>): void {
+		work.catch((error) => streamDeck.logger.error(`${this.manifestId}: ${error}`));
 	}
 
 	override async onWillAppear(ev: WillAppearEvent<KeySettings>): Promise<void> {
@@ -98,13 +116,20 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 		this.settings.set(ev.action.id, ev.payload.settings);
 		await this.show(ev.action);
 
-		if (!this.timer) this.timer = setTimeout(() => this.refreshAll(), this.stagger);
+		if (!this.timer) this.timer = setTimeout(() => this.safely(this.refreshAll()), this.stagger);
 		else await this.refresh(ev.action.id);
 	}
 
+	// When the last key of this kind goes away (a page switch does this),
+	// the timer stops, and everything it knew is forgotten. The next key to
+	// show up starts both again.
 	override onWillDisappear(ev: WillDisappearEvent<KeySettings>): void {
 		this.settings.delete(ev.action.id);
 		this.sent.delete(ev.action.id);
+		if (this.settings.size > 0) return;
+		clearTimeout(this.timer);
+		this.timer = undefined;
+		this.known.clear();
 	}
 
 	override async onDidReceiveSettings(ev: DidReceiveSettingsEvent<KeySettings>): Promise<void> {
@@ -119,9 +144,9 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 		const repo = this.repoOf(ev.action.id);
 		if (!repo) return;
 		const known = this.known.get(this.keyOf(ev.action.id)!);
-		const login = await owner();
 		const parsed = parseRepo(repo);
-		const url = `https://github.com/${parsed?.owner ?? (login.ok ? login.data : "")}/${parsed?.name ?? repo}`;
+		const login = parsed?.owner || !this.follows ? undefined : await owner();
+		const url = `https://github.com/${parsed?.owner ?? (login?.ok ? login.data : "")}/${parsed?.name ?? repo}`;
 		await streamDeck.system.openUrl(this.link(known?.data, repo, url, this.settingsOf(ev.action.id)));
 	}
 
@@ -154,7 +179,7 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 		const settings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
 		const minutes = Number(settings.refreshMinutes) || DEFAULT_MINUTES;
 		clearTimeout(this.timer);
-		this.timer = setTimeout(() => this.refreshAll(), minutes * 60 * 1000);
+		this.timer = setTimeout(() => this.safely(this.refreshAll()), minutes * 60 * 1000);
 
 		// One refresh per different answer, not per key: two keys showing
 		// the same thing share it.
@@ -175,15 +200,16 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 		if (known.busy || (!force && Date.now() - known.at < 60 * 1000)) return this.showAll();
 
 		known.busy = true;
-		const parsed = parseRepo(repo);
-		const login = parsed?.owner ? { ok: true as const, data: parsed.owner } : await owner();
-		const result: Result<T> = !parsed
-			? { ok: false, message: "That isn't a repo name", short: "Bad name" }
-			: !login.ok
-				? login
-				: await this.load(await token(), login.data, parsed.name, this.settingsOf(id));
-
-		known.busy = false;
+		let result: Result<T>;
+		try {
+			result = await this.ask(repo, id);
+		} catch (error) {
+			// Anything unexpected (a reply that isn't what GitHub usually
+			// sends) becomes a message on the key, not a stuck "loading".
+			result = { ok: false, message: "Something unexpected came back", short: "Odd reply", detail: String(error) };
+		} finally {
+			known.busy = false;
+		}
 		known.at = Date.now();
 		if (result.ok) {
 			known.data = result.data;
@@ -199,9 +225,19 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 		if (open && this.settings.has(open.id)) await this.explain(open.id);
 	}
 
+	// Works out whose repo it is, then asks the key's own question.
+	private async ask(repo: string, id: string): Promise<Result<T>> {
+		const parsed = parseRepo(repo);
+		if (!parsed) return { ok: false, message: "That isn't a repo name", short: "Bad name" };
+		const login = parsed.owner || !this.follows ? { ok: true as const, data: parsed.owner ?? "" } : await owner();
+		if (!login.ok) return login;
+		return this.load(await token(), login.data, parsed.name, this.settingsOf(id));
+	}
+
 	// A new repo on the Repo key: every key that follows it asks about the
 	// new repo (unless it already did in the last minute).
 	private async followed(): Promise<void> {
+		if (!this.follows) return;
 		await this.showAll();
 		for (const id of this.settings.keys()) {
 			if (!this.settingsOf(id).repo) await this.refresh(id);

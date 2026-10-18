@@ -18,3 +18,8 @@ preview/tiers.html
 .env.*
 *.token
 settings.local.json
+
+# The GitHub profiles, made by "npm run profiles". Their Home keys point at
+# my own Home profiles by id, read from Stream Deck's files on this Mac, so
+# they're made fresh here instead of kept in a public repo.
+*.sdPlugin/profiles

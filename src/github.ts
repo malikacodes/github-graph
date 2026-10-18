@@ -78,7 +78,10 @@ async function ask<T>(token: string | undefined, query: string, variables: objec
 	// GraphQL can answer "200 OK" and still have refused the question, for
 	// example when the token is valid but isn't allowed to read the profile.
 	// In that case the data part is just missing.
-	const body = (await response.json()) as { data?: T; errors?: { message: string }[] };
+	// Wifi that needs a login page can answer with a web page instead of
+	// GitHub's data, so a reply that won't read is its own message.
+	const body = (await response.json().catch(() => undefined)) as { data?: T; errors?: { message: string }[] } | undefined;
+	if (!body) return { ok: false, message: "GitHub's answer didn't make sense", short: "Odd reply" };
 	if (!body.data) {
 		const detail = body.errors?.map((error) => error.message).join("; ");
 		return { ok: false, message: "Token can't read this", short: "No access", detail };
@@ -298,6 +301,7 @@ export type Counts = {
 	open: number;
 	closed: number; // for pull requests, merged and closed without merging
 	merged: number; // pull requests only
+	off?: boolean; // issues only: turned off in the repo's settings
 	oldest?: string; // when the oldest open one was opened
 };
 
@@ -361,7 +365,9 @@ export async function fetchIssueCounts(token: string | undefined, owner: string,
 	if (!result.ok) return result;
 	const repo = result.data.repository;
 	if (!repo) return { ok: false, message: "Repo not found", short: "No repo" };
-	if (!repo.hasIssuesEnabled) return { ok: false, message: "Issues are turned off", short: "Issues off" };
+	// Issues turned off in the repo's settings (forks start that way) is an
+	// answer, not a problem, so it comes back like any other count.
+	if (!repo.hasIssuesEnabled) return { ok: true, data: { url: repo.url, private: repo.isPrivate, open: 0, closed: 0, merged: 0, off: true } };
 	return {
 		ok: true,
 		data: {
@@ -411,7 +417,11 @@ async function rest<T>(token: string | undefined, path: string): Promise<Result<
 			.catch(() => undefined);
 		return { ok: false, message: `GitHub error ${response.status}`, short: `Error ${response.status}`, detail };
 	}
-	return { ok: true, data: (await response.json()) as T };
+	// 204 means "nothing to send", like the weekly commits of an empty repo.
+	if (response.status === 204) return { ok: true, data: null as T };
+	const body = await response.json().catch(() => undefined);
+	if (body === undefined) return { ok: false, message: "GitHub's answer didn't make sense", short: "Odd reply" };
+	return { ok: true, data: body as T };
 }
 
 export async function fetchLatestRun(token: string | undefined, owner: string, name: string): Promise<Result<Run>> {
@@ -493,10 +503,12 @@ export async function fetchCommitWeeks(
 ): Promise<Result<number[]>> {
 	const path = `${encodeURIComponent(owner)}/${encodeURIComponent(name)}/stats/commit_activity`;
 	for (let attempt = 0; attempt < 4; attempt++) {
-		const result = await rest<{ total: number }[] | Record<string, never>>(token, path);
+		const result = await rest<{ total: number }[] | Record<string, never> | null>(token, path);
 		if (!result.ok) return result;
 
-		// A 202 has an empty object for a body, not a list.
+		// An empty repo has no weeks at all (that's the 204). A 202 has an
+		// empty object for a body, not a list.
+		if (result.data === null) return { ok: true, data: [0, 0, 0, 0, 0, 0, 0, 0] };
 		if (Array.isArray(result.data)) return { ok: true, data: result.data.slice(-8).map((week) => week.total) };
 		await wait(3000);
 	}
@@ -504,7 +516,7 @@ export async function fetchCommitWeeks(
 }
 
 // A repo's branches, newest commit first, and which one is the default.
-export type Branches = { main: string; names: string[] };
+type Branches = { main: string; names: string[] };
 
 export async function fetchBranches(token: string | undefined, owner: string, name: string): Promise<Result<Branches>> {
 	const result = await ask<{
@@ -559,9 +571,13 @@ export async function fetchRelease(token: string | undefined, owner: string, nam
 
 	if (!pre) {
 		const latest = await rest<Body>(token, `${repo}/releases/latest`);
-		// No releases at all is a 404 here, which isn't an error for this key.
-		if (!latest.ok && latest.short === "No repo") return { ok: true, data: undefined };
-		return latest.ok ? { ok: true, data: shape(latest.data) } : latest;
+		if (latest.ok) return { ok: true, data: shape(latest.data) };
+		if (latest.short !== "No repo") return latest;
+
+		// A 404 here means either "no releases" or "no such repo" (or one the
+		// token can't see). Asking about the repo itself tells them apart.
+		const exists = await rest<object>(token, repo);
+		return exists.ok ? { ok: true, data: undefined } : exists;
 	}
 
 	const list = await rest<Body[]>(token, `${repo}/releases?per_page=10`);
@@ -577,15 +593,24 @@ export type Alerts = { off: boolean; critical: number; high: number; medium: num
 
 export async function fetchAlerts(token: string | undefined, owner: string, name: string): Promise<Result<Alerts>> {
 	const repo = `${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
-	const result = await rest<{ security_advisory: { severity: string } }[]>(token, `${repo}/dependabot/alerts?state=open&per_page=100`);
+	type Alert = { security_advisory: { severity: string } };
 	const none = { off: false, critical: 0, high: 0, medium: 0, low: 0 };
 
-	if (!result.ok && result.detail?.toLowerCase().includes("disabled")) return { ok: true, data: { ...none, off: true } };
-	if (!result.ok && result.short === "Error 403") return { ok: false, message: "Token can't read alerts", short: "No access" };
-	if (!result.ok) return result;
+	// GitHub sends at most 100 alerts at a time, so it keeps asking for the
+	// next 100 until a page comes back short. Ten pages is a thousand
+	// alerts, which would be a very different problem.
+	const all: Alert[] = [];
+	for (let page = 1; page <= 10; page++) {
+		const result = await rest<Alert[]>(token, `${repo}/dependabot/alerts?state=open&per_page=100&page=${page}`);
+		if (!result.ok && result.detail?.toLowerCase().includes("disabled")) return { ok: true, data: { ...none, off: true } };
+		if (!result.ok && result.short === "Error 403") return { ok: false, message: "Token can't read alerts", short: "No access" };
+		if (!result.ok) return result;
+		all.push(...result.data);
+		if (result.data.length < 100) break;
+	}
 
 	const counts = { ...none };
-	for (const alert of result.data) {
+	for (const alert of all) {
 		const severity = alert.security_advisory.severity as keyof typeof counts;
 		if (severity in counts && severity !== "off") counts[severity]++;
 		else counts.low++;
@@ -597,7 +622,7 @@ export async function fetchAlerts(token: string | undefined, owner: string, name
 // by their Status column. Reading a project that belongs to me (not to a
 // repo or an organization) needs the classic read:project permission.
 export type Board = { title: string; url: string; todo: number; doing: number; done: number };
-export type BoardChoice = { number: number; title: string };
+type BoardChoice = { number: number; title: string };
 
 type ProjectNode = {
 	number: number;
@@ -627,6 +652,9 @@ export async function fetchBoard(token: string | undefined, number: number | und
 	);
 	if (!result.ok) return noProjectScope(result);
 
+	// A board picked by number that isn't there any more is a problem to
+	// say. No boards at all is just "none yet".
+	if (number && !result.data.viewer.one) return { ok: false, message: "That board isn't there", short: "No board" };
 	const project = result.data.viewer.one ?? result.data.viewer.newest?.nodes[0];
 	if (!project) return { ok: true, data: undefined };
 	return { ok: true, data: { title: project.title, url: project.url, ...pile(project.items.nodes.map((n) => n.fieldValueByName?.name)) } };
