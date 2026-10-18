@@ -1,26 +1,11 @@
-import type { Day } from "./github";
+import { dayNumber } from "./calendar.ts";
+import type { Day } from "./github.ts";
 
 // Works out my current streak and my longest one. Nothing in this file
 // reads the store or talks to Stream Deck. Days go in, two numbers come
 // out, which is what lets the tests run it with made-up days.
-//
-// The tests run in plain Node, and plain Node can't follow this project's
-// imports that leave off the file ending. So this file imports nothing that
-// exists when it runs (the Day import above is only a type, and types are
-// erased). That's also why it does its own bit of date math and doesn't
-// use calendar.ts.
 
 export type Mode = "daily" | "weekdays" | "weekly";
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-// Turns "2026-10-05" into a plain count of days since January 1, 1970.
-// Counting in whole numbers means the next day is always just +1, with no
-// months, leap years or clock changes to think about. It's done in UTC for
-// the same reason as calendar.ts: no day can come out 23 or 25 hours long.
-function dayNumber(date: string): number {
-	return Date.parse(`${date}T00:00:00Z`) / DAY_MS;
-}
 
 // The rules:
 //

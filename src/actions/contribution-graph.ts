@@ -7,9 +7,9 @@ import streamDeck, {
 	type WillDisappearEvent,
 } from "@elgato/streamdeck";
 
-import { addDays, weekColumns, weekday } from "../calendar";
-import { onChange, refreshNow, start, store } from "../data";
-import { drawGraph, drawWeek, WEEKS_SHOWN } from "../draw";
+import { addDays, weekColumns, weekday } from "../calendar.ts";
+import { onChange, refreshNow, start, store } from "../data.ts";
+import { drawGraph, drawWeek, WEEKS_SHOWN } from "../draw.ts";
 
 // Which of the two views a dial is on: the graph, or this week. It's the
 // one thing each dial remembers for itself. It's not secret, so it's fine

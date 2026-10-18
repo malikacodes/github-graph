@@ -1,5 +1,10 @@
-import type { Placed } from "./branches";
-import type { Day } from "./github";
+import type { Placed } from "./branches.ts";
+import type { Day } from "./github.ts";
+
+// Every key and dial is plain black, the same as the deck around it. The
+// keys started out in GitHub's dark gray (#0d1117), but on the deck that
+// showed up as a gray square next to the keys around it.
+export const BLACK = "#000000";
 
 // GitHub's dark theme greens. The empty color is a touch lighter than
 // GitHub's, because theirs disappears against the strip's black background.
@@ -50,6 +55,25 @@ function squares(
 // picture packed into one long string.
 export function asImage(svg: string): string {
 	return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+}
+
+// A key picture: a 144 by 144 black tile with content drawn on it. A key
+// is 72x72 on most Stream Decks and 144x144 on the sharper ones, so
+// everything is drawn on the 144 grid and Stream Deck scales it down
+// where it needs to.
+export function blackKey(content: string): string {
+	return asImage(
+		`<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144"><rect width="144" height="144" fill="${BLACK}"/>${content}</svg>`,
+	);
+}
+
+// Names come from GitHub (repos, branches, boards), so anything that means
+// something in SVG gets swapped for its safe version before it goes in a
+// picture. One stray & in a label and the whole key comes out blank, and a
+// quote would end an attribute early. The & has to be swapped first, or
+// it would catch the ones the other swaps just added.
+export function safe(text: string): string {
+	return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 // --- The single dial graph ---
@@ -153,12 +177,6 @@ const FADED = 0.3;
 // wider than a browser does. This is from what fit on the real strip.
 const LETTER = 0.62;
 
-// Branch names come from whoever made the branch, so anything that means
-// something in SVG gets swapped for its safe version first.
-function escape(text: string): string {
-	return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
 // The line along the bottom: the picked lane's name, and whether it's
 // still open or when it merged. On a narrow strip the "when" goes first,
 // then the letters get smaller, and only a really long name on one dial
@@ -186,7 +204,7 @@ function nameLine(lane: Placed, width: number): string {
 	if (name.length > letters) name = `${name.slice(0, letters - 1)}…`;
 
 	const text = (x: number, anchor: string, fill: string, words: string, bold = false) =>
-		`<text x="${x}" y="${NAME_Y}" text-anchor="${anchor}" font-family="${FONT}" font-size="${size}"${bold ? ` font-weight="600"` : ""} fill="${fill}">${escape(words)}</text>`;
+		`<text x="${x}" y="${NAME_Y}" text-anchor="${anchor}" font-family="${FONT}" font-size="${size}"${bold ? ` font-weight="600"` : ""} fill="${fill}">${safe(words)}</text>`;
 
 	if (!extra) return text(width / 2, "middle", lane.color, name, true);
 
@@ -218,7 +236,7 @@ export function drawBranches(
 	let content = "";
 
 	if (message) {
-		content = `<text x="${width / 2}" y="56" text-anchor="middle" font-family="${FONT}" font-size="13" fill="${QUIET}">${escape(message)}</text>`;
+		content = `<text x="${width / 2}" y="56" text-anchor="middle" font-family="${FONT}" font-size="13" fill="${QUIET}">${safe(message)}</text>`;
 	} else {
 		let faded = "";
 		let bright = "";
@@ -243,10 +261,10 @@ export function drawBranches(
 
 			// Rings on main where the lane leaves and comes back, filled with
 			// black so main's line doesn't show through them.
-			part += `<circle cx="${from}" cy="${MAIN_Y}" r="3.5" fill="#000000" stroke="${lane.color}" stroke-width="2"/>`;
+			part += `<circle cx="${from}" cy="${MAIN_Y}" r="3.5" fill="${BLACK}" stroke="${lane.color}" stroke-width="2"/>`;
 			part += lane.open
 				? `<circle cx="${to}" cy="${y}" r="3" fill="${lane.color}"/>`
-				: `<circle cx="${to}" cy="${MAIN_Y}" r="3.5" fill="#000000" stroke="${lane.color}" stroke-width="2"/>`;
+				: `<circle cx="${to}" cy="${MAIN_Y}" r="3.5" fill="${BLACK}" stroke="${lane.color}" stroke-width="2"/>`;
 
 			// Uncommitted changes get a ring around the end dot, so I can spot
 			// them without picking the lane. A loop has no end dot, so it only
@@ -261,7 +279,7 @@ export function drawBranches(
 		});
 
 		const mainLine = `<line x1="0" y1="${MAIN_Y}" x2="${width}" y2="${MAIN_Y}" stroke="${MAIN_COLOR}" stroke-width="2.5"/>`;
-		const mainName = `<text x="4" y="${MAIN_Y - 6}" font-family="${FONT}" font-size="9" fill="${MAIN_COLOR}">${escape(main)}</text>`;
+		const mainName = `<text x="4" y="${MAIN_Y - 6}" font-family="${FONT}" font-size="9" fill="${MAIN_COLOR}">${safe(main)}</text>`;
 		const name = lanes[picked] ? nameLine(lanes[picked], width) : "";
 		content = faded + mainLine + bright + mainName + name;
 	}

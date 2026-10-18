@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { type Local, parseAhead, parseRefs, parseStatus } from "./branches";
+import { type Local, parseAhead, parseRefs, parseStatus } from "./branches.ts";
 
 const run = promisify(execFile);
 

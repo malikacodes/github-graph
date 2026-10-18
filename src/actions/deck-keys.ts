@@ -1,7 +1,7 @@
 import streamDeck, { action, DeviceType, type KeyAction, type KeyDownEvent, SingletonAction, type WillAppearEvent } from "@elgato/streamdeck";
 
-import { focus, onFocus } from "../focus";
-import { COLORS, drawGithubKey } from "../key-art";
+import { focus, onFocus } from "../focus.ts";
+import { COLORS, drawGithubKey } from "../key-art.ts";
 
 // The GitHub profiles this plugin ships, one per deck. A plugin can only
 // switch to profiles it ships itself, so these are bundled in the plugin

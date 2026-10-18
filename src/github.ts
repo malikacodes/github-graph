@@ -262,15 +262,14 @@ export async function fetchNetwork(token: string | undefined, owner: string, nam
 
 	if (others.length === 0) return { ok: true, data: { url: repo.url, main, branches: [], merged } };
 
+	// One failed compare fails the whole map. A branch that compare left off
+	// on purpose (see above) comes back with no data and gets zeros.
 	const compared = await Promise.all(others.map((ref) => compare(token, owner, name, main, ref.name)));
-	const failed = compared.find((result) => !result.ok);
-	if (failed && !failed.ok) return failed;
-
-	const branches = others.map((ref, i) => {
-		const result = compared[i];
-		const info = result.ok ? result.data : undefined;
-		return { name: ref.name, oid: ref.target.oid, ahead: info?.ahead ?? 0, firstCommit: info?.firstCommit };
-	});
+	const branches: Network["branches"] = [];
+	for (const [i, result] of compared.entries()) {
+		if (!result.ok) return result;
+		branches.push({ name: others[i].name, oid: others[i].target.oid, ahead: result.data?.ahead ?? 0, firstCommit: result.data?.firstCommit });
+	}
 
 	return { ok: true, data: { url: repo.url, main, branches, merged } };
 }

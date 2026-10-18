@@ -1,10 +1,10 @@
 import { action } from "@elgato/streamdeck";
 
-import { fetchLatestRun, type Run } from "../github";
-import { COLORS, type Face } from "../key-art";
-import { outcome, runLesson } from "../learn";
-import { ago } from "../picking";
-import { GitHubKey } from "./github-key";
+import { fetchLatestRun, type Run } from "../github.ts";
+import { COLORS, type Face } from "../key-art.ts";
+import { outcome, runLesson } from "../learn.ts";
+import { ago } from "../picking.ts";
+import { GitHubKey } from "./github-key.ts";
 
 // The latest GitHub Actions run on the repo: a check that passed, a cross
 // that failed, or a dashed ring while it's still going.

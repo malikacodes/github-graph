@@ -1,10 +1,10 @@
 import { action } from "@elgato/streamdeck";
 
-import { fetchRelease, type Release, type Result } from "../github";
-import { COLORS, type Face } from "../key-art";
-import { releaseLesson } from "../learn";
-import { ago } from "../picking";
-import { GitHubKey, type KeySettings } from "./github-key";
+import { fetchRelease, type Release, type Result } from "../github.ts";
+import { COLORS, type Face } from "../key-art.ts";
+import { releaseLesson } from "../learn.ts";
+import { ago } from "../picking.ts";
+import { GitHubKey, type KeySettings } from "./github-key.ts";
 
 // "No releases" is a real answer, not a missing one, so the release is
 // wrapped: { release: undefined } means "checked, and there are none".

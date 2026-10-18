@@ -1,12 +1,12 @@
 import streamDeck, { action } from "@elgato/streamdeck";
 
-import { owner, token } from "../focus";
-import { fetchBranches, fetchComparison, type Result } from "../github";
-import { COLORS, type Face } from "../key-art";
-import { compareLesson, type CompareView } from "../learn";
-import { parseRepo } from "../branches";
-import { pickBranches } from "../picking";
-import { GitHubKey, type KeySettings } from "./github-key";
+import { owner, token } from "../focus.ts";
+import { fetchBranches, fetchComparison, type Result } from "../github.ts";
+import { COLORS, type Face } from "../key-art.ts";
+import { compareLesson, type CompareView } from "../learn.ts";
+import { parseRepo } from "../branches.ts";
+import { pickBranches } from "../picking.ts";
+import { GitHubKey, type KeySettings } from "./github-key.ts";
 
 // How far one branch has moved from another. Blank settings compare the
 // newest branch with main, so it works on whatever repo the Repo key picks.

@@ -16,3 +16,4 @@ and how I fixed it.
 | 08 | 2026-10-15 | [Stars, commits and branches](08-stats-commits-branches.md) |
 | 09 | 2026-10-15 | [Off isn't the same as safe](09-releases-security-projects.md) |
 | 10 | 2026-10-15 | [Two decks, one repo](10-two-decks-one-repo.md) |
+| 11 | 2026-10-17 | [Three copies of three lines](11-three-copies-of-three-lines.md) |

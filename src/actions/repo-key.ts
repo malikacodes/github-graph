@@ -7,12 +7,12 @@ import streamDeck, {
 	type WillAppearEvent,
 } from "@elgato/streamdeck";
 
-import type { GlobalSettings } from "../data";
-import { focus, forget, isPrivate, onFocus, repoList, setFocus } from "../focus";
-import { COLORS, drawGithubKey } from "../key-art";
-import { repoLesson } from "../learn";
-import { stepRepo } from "../picking";
-import { type KeySettings, sendRepos } from "./github-key";
+import type { GlobalSettings } from "../data.ts";
+import { focus, forget, isPrivate, onFocus, repoList, setFocus } from "../focus.ts";
+import { COLORS, drawGithubKey } from "../key-art.ts";
+import { repoLesson } from "../learn.ts";
+import { stepRepo } from "../picking.ts";
+import { type KeySettings, sendRepos } from "./github-key.ts";
 
 // The Repo key: it shows the repo every GitHub key follows, and a press
 // steps to the next one, newest push first. It's the one key where a press

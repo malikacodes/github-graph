@@ -1,24 +1,9 @@
+import { blackKey, safe } from "./draw.ts";
+
 // The look every GitHub key shares: a small drawing in its own color on
 // top, the main number or word under it in white, and a few gray words
 // along the bottom. The drawing leads, the same way the ring and the fire
 // do on my other keys.
-//
-// This file imports nothing, so the tests can load it. Node's test runner
-// can't follow an import that leaves off ".ts", and keys.ts has those, so
-// the black tile and the text escaping are written out again here.
-
-// Every key is plain black, the same as the deck around it.
-function key(content: string): string {
-	const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144"><rect width="144" height="144" fill="#000000"/>${content}</svg>`;
-	return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
-}
-
-// Repo and branch names come from GitHub, so anything that means something
-// in SVG gets swapped for its safe version. The & goes first, or it would
-// catch the ones the other swaps add.
-function safe(text: string): string {
-	return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-}
 
 export const COLORS = {
 	pink: "#ff7eb6",
@@ -126,7 +111,7 @@ export function drawGithubKey(face: Face): string {
 	const small = fit(face.small, 132, 16, 12);
 	content += `<text x="72" y="130" font-size="${small.size}" fill="${face.alarm ? COLORS.red : COLORS.gray}" text-anchor="middle" ${FONT}>${safe(small.text)}</text>`;
 
-	return key(content);
+	return blackKey(content);
 }
 
 // The middle of the Commit Activity key: a bar for each week, oldest on the

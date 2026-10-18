@@ -6,9 +6,9 @@ import {
 	type WillAppearEvent,
 } from "@elgato/streamdeck";
 
-import { weekColumns } from "../calendar";
-import { hasYear, loadYear, onChange, refreshNow, start, store } from "../data";
-import { drawWide } from "../draw";
+import { weekColumns } from "../calendar.ts";
+import { hasYear, loadYear, onChange, refreshNow, start, store } from "../data.ts";
+import { drawWide } from "../draw.ts";
 
 // The graph stretched across all four dials. Each dial draws its own
 // quarter of one 800px picture (see drawWide), so this action goes on

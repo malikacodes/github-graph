@@ -8,6 +8,14 @@ export function addDays(date: string, days: number): string {
 	return moved.toISOString().slice(0, 10);
 }
 
+// Turns "2026-10-05" into a plain count of days since January 1, 1970.
+// Counting in whole numbers means the next day is always just +1, with no
+// months, leap years or clock changes to think about. It's in UTC like the
+// rest of this file, so no day can come out 23 or 25 hours long.
+export function dayNumber(date: string): number {
+	return Date.parse(`${date}T00:00:00Z`) / (24 * 60 * 60 * 1000);
+}
+
 // 0 is Sunday, 6 is Saturday.
 export function weekday(date: string): number {
 	return new Date(`${date}T00:00:00Z`).getUTCDay();
