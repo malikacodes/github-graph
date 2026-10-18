@@ -165,31 +165,15 @@ async function compare(
 	branch: string,
 ): Promise<Result<{ ahead: number; firstCommit?: string } | undefined>> {
 	const path = `${encodeURIComponent(owner)}/${encodeURIComponent(name)}/compare/${encodeURIComponent(main)}...${encodeURIComponent(branch)}`;
-
-	let response: Response;
-	try {
-		response = await fetch(`https://api.github.com/repos/${path}?per_page=1`, {
-			headers: {
-				...(token ? { Authorization: `Bearer ${token}` } : {}),
-				Accept: "application/vnd.github+json",
-				"User-Agent": "github-graph-stream-deck",
-			},
-		});
-	} catch {
-		return { ok: false, message: "No internet", short: "Offline" };
-	}
-
-	if (response.status === 401) return { ok: false, message: "Token didn't work", short: "Bad token" };
+	const result = await rest<{ ahead_by: number; commits: { commit: { author: { date: string } | null } }[] }>(token, `${path}?per_page=1`);
 
 	// A branch deleted between the two requests, or one GitHub can't
 	// compare, just gets left off the map. It's not worth losing the
 	// whole map over one branch.
-	if (response.status === 404 || response.status === 422) return { ok: true, data: undefined };
-	if (!response.ok) {
-		return { ok: false, message: `GitHub error ${response.status}`, short: `Error ${response.status}` };
-	}
+	if (!result.ok && (result.short === "No repo" || result.short === "Error 422")) return { ok: true, data: undefined };
+	if (!result.ok) return result;
 
-	const body = (await response.json()) as { ahead_by: number; commits: { commit: { author: { date: string } | null } }[] };
+	const body = result.data;
 	return { ok: true, data: { ahead: body.ahead_by, firstCommit: body.commits[0]?.commit.author?.date } };
 }
 
@@ -288,15 +272,162 @@ export async function fetchNetwork(token: string | undefined, owner: string, nam
 	return { ok: true, data: { url: repo.url, main, branches, merged } };
 }
 
-// My repos, most recently pushed first, for the dropdown on the Branch Map
-// settings page. It only lists what the token can see, so with a token
-// that can't read private repos, those just aren't in the list.
-export async function fetchRepos(token: string | undefined): Promise<Result<string[]>> {
-	const result = await ask<{ viewer: { repositories: { nodes: { name: string }[] } } }>(
+// My repos, most recently pushed first, for the repo pickers. It only
+// lists what the token can see, so with a token that can't read private
+// repos, those just aren't in the list.
+export type RepoListing = { name: string; private: boolean };
+
+export async function fetchRepos(token: string | undefined): Promise<Result<RepoListing[]>> {
+	const result = await ask<{ viewer: { repositories: { nodes: { name: string; isPrivate: boolean }[] } } }>(
 		token,
-		`{ viewer { repositories(first: 100, ownerAffiliations: OWNER, orderBy: { field: PUSHED_AT, direction: DESC }) { nodes { name } } } }`,
+		`{ viewer { repositories(first: 100, ownerAffiliations: OWNER, orderBy: { field: PUSHED_AT, direction: DESC }) { nodes { name isPrivate } } } }`,
 		{},
 	);
 	if (!result.ok) return result;
-	return { ok: true, data: result.data.viewer.repositories.nodes.map((repo) => repo.name) };
+	return { ok: true, data: result.data.viewer.repositories.nodes.map((repo) => ({ name: repo.name, private: repo.isPrivate })) };
+}
+
+// --- One repo at a glance, for the GitHub keys ---
+
+// What the pull request and issue keys need, in one question. Each key
+// asks its own question, on purpose: if one key needs a permission the
+// token doesn't have, only that key says so, and the rest keep working.
+export type Counts = {
+	url: string;
+	private: boolean;
+	open: number;
+	closed: number; // for pull requests, merged and closed without merging
+	merged: number; // pull requests only
+	oldest?: string; // when the oldest open one was opened
+};
+
+export async function fetchPullCounts(token: string | undefined, owner: string, name: string): Promise<Result<Counts>> {
+	const result = await ask<{
+		repository: {
+			url: string;
+			isPrivate: boolean;
+			open: { totalCount: number; nodes: { createdAt: string }[] };
+			merged: { totalCount: number };
+			closed: { totalCount: number };
+		} | null;
+	}>(
+		token,
+		`query($owner: String!, $name: String!) {
+			repository(owner: $owner, name: $name) {
+				url isPrivate
+				open: pullRequests(states: OPEN, first: 1, orderBy: { field: CREATED_AT, direction: ASC }) { totalCount nodes { createdAt } }
+				merged: pullRequests(states: MERGED) { totalCount }
+				closed: pullRequests(states: CLOSED) { totalCount }
+			}
+		}`,
+		{ owner, name },
+	);
+	if (!result.ok) return result;
+	const repo = result.data.repository;
+	if (!repo) return { ok: false, message: "Repo not found", short: "No repo" };
+	return {
+		ok: true,
+		data: {
+			url: repo.url,
+			private: repo.isPrivate,
+			open: repo.open.totalCount,
+			merged: repo.merged.totalCount,
+			closed: repo.closed.totalCount,
+			oldest: repo.open.nodes[0]?.createdAt,
+		},
+	};
+}
+
+export async function fetchIssueCounts(token: string | undefined, owner: string, name: string): Promise<Result<Counts>> {
+	const result = await ask<{
+		repository: {
+			url: string;
+			isPrivate: boolean;
+			hasIssuesEnabled: boolean;
+			open: { totalCount: number; nodes: { createdAt: string }[] };
+			closed: { totalCount: number };
+		} | null;
+	}>(
+		token,
+		`query($owner: String!, $name: String!) {
+			repository(owner: $owner, name: $name) {
+				url isPrivate hasIssuesEnabled
+				open: issues(states: OPEN, first: 1, orderBy: { field: CREATED_AT, direction: ASC }) { totalCount nodes { createdAt } }
+				closed: issues(states: CLOSED) { totalCount }
+			}
+		}`,
+		{ owner, name },
+	);
+	if (!result.ok) return result;
+	const repo = result.data.repository;
+	if (!repo) return { ok: false, message: "Repo not found", short: "No repo" };
+	if (!repo.hasIssuesEnabled) return { ok: false, message: "Issues are turned off", short: "Issues off" };
+	return {
+		ok: true,
+		data: {
+			url: repo.url,
+			private: repo.isPrivate,
+			open: repo.open.totalCount,
+			closed: repo.closed.totalCount,
+			merged: 0,
+			oldest: repo.open.nodes[0]?.createdAt,
+		},
+	};
+}
+
+// The newest GitHub Actions run, from REST because Actions isn't in
+// GraphQL. A public repo answers this with any token, or none.
+export type Run = {
+	workflows: number; // how many workflow files the repo has
+	name?: string;
+	status?: string; // queued, in_progress, completed...
+	conclusion?: string | null; // success, failure, cancelled... once completed
+	branch?: string;
+	at?: string; // when it last changed
+	url?: string;
+};
+
+async function rest<T>(token: string | undefined, path: string): Promise<Result<T>> {
+	let response: Response;
+	try {
+		response = await fetch(`https://api.github.com/repos/${path}`, {
+			headers: {
+				...(token ? { Authorization: `Bearer ${token}` } : {}),
+				Accept: "application/vnd.github+json",
+				"User-Agent": "github-graph-stream-deck",
+			},
+		});
+	} catch {
+		return { ok: false, message: "No internet", short: "Offline" };
+	}
+	if (response.status === 401) return { ok: false, message: "Token didn't work", short: "Bad token" };
+	if (response.status === 404) return { ok: false, message: "Repo not found", short: "No repo" };
+	if (!response.ok) return { ok: false, message: `GitHub error ${response.status}`, short: `Error ${response.status}` };
+	return { ok: true, data: (await response.json()) as T };
+}
+
+export async function fetchLatestRun(token: string | undefined, owner: string, name: string): Promise<Result<Run>> {
+	const repo = `${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
+	const workflows = await rest<{ total_count: number }>(token, `${repo}/actions/workflows?per_page=1`);
+	if (!workflows.ok) return workflows;
+	if (workflows.data.total_count === 0) return { ok: true, data: { workflows: 0 } };
+
+	const runs = await rest<{
+		workflow_runs: { name: string; status: string; conclusion: string | null; head_branch: string; updated_at: string; html_url: string }[];
+	}>(token, `${repo}/actions/runs?per_page=1`);
+	if (!runs.ok) return runs;
+
+	const run = runs.data.workflow_runs[0];
+	return {
+		ok: true,
+		data: {
+			workflows: workflows.data.total_count,
+			name: run?.name,
+			status: run?.status,
+			conclusion: run?.conclusion,
+			branch: run?.head_branch,
+			at: run?.updated_at,
+			url: run?.html_url,
+		},
+	};
 }
