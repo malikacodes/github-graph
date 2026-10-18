@@ -9,7 +9,7 @@ import {
 } from "@elgato/streamdeck";
 
 import { animate, stopAnimating } from "../animate.ts";
-import { onChange, refreshNow, start, store } from "../data.ts";
+import { onChange, refreshNow, start, stop, store } from "../data.ts";
 import { drawGoalKey } from "../keys.ts";
 
 const GREY = "#8b949e";
@@ -82,6 +82,8 @@ export class DailyGoal extends SingletonAction<Settings> {
 		this.sent.delete(ev.action.id);
 		this.started.delete(ev.action.id);
 		stopAnimating(ev.action.id);
+		// Only a key ever called start(), so only a key calls stop().
+		if (ev.payload.controller === "Keypad") stop();
 	}
 
 	// A press always refreshes. If today's goal is already met it plays the

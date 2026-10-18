@@ -4,10 +4,11 @@ import {
 	type DialRotateEvent,
 	SingletonAction,
 	type WillAppearEvent,
+	type WillDisappearEvent,
 } from "@elgato/streamdeck";
 
 import { weekColumns } from "../calendar.ts";
-import { hasYear, loadYear, onChange, refreshNow, start, store } from "../data.ts";
+import { hasYear, loadYear, onChange, refreshNow, start, stop, store } from "../data.ts";
 import { drawWide } from "../draw.ts";
 
 // The graph stretched across all four dials. Each dial draws its own
@@ -30,6 +31,11 @@ export class WideGraph extends SingletonAction {
 
 		await this.show(ev.action);
 		start();
+	}
+
+	// Only a dial ever called start(), so only a dial calls stop().
+	override onWillDisappear(ev: WillDisappearEvent): void {
+		if (ev.payload.controller === "Encoder") stop();
 	}
 
 	override async onDialDown(): Promise<void> {

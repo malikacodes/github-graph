@@ -9,13 +9,13 @@ import streamDeck, {
 } from "@elgato/streamdeck";
 
 import { parseRepo } from "../branches.ts";
-import type { GlobalSettings } from "../data.ts";
-import { focus, forget, isPrivate, onFocus, owner, repoList, token } from "../focus.ts";
+import { focus, isPrivate, onFocus, owner, repoList, token } from "../focus.ts";
 import type { Result } from "../github.ts";
 import type { Face } from "../key-art.ts";
 import { drawGithubKey } from "../key-art.ts";
 import type { Lesson } from "../learn.ts";
 import { whichRepo } from "../picking.ts";
+import { onSettingsChange, register, safely, unregister } from "../refresh.ts";
 
 // A key's settings. repo is the repo it's pinned to: empty means it
 // follows the Repo key, and every new key starts that way. The rest belong
@@ -38,13 +38,6 @@ type Known<T> = {
 	at: number;
 	busy: boolean;
 };
-
-const DEFAULT_MINUTES = 30;
-
-// Each kind of key waits two seconds longer than the last before its
-// first refresh, so a page of nine keys doesn't ask GitHub nine things in
-// the same second. GitHub has a separate limit for bursts like that.
-let nextStagger = 0;
 
 // Everything the GitHub keys have in common. Each key only says how to
 // load its numbers, how to draw them, what its settings page teaches, and
@@ -75,61 +68,49 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 
 	private settings = new Map<string, KeySettings>();
 	private known = new Map<string, Known<T>>();
-	private timer?: NodeJS.Timeout;
-	private stagger = (nextStagger++ % 9) * 2000;
-	private lastGlobal = "";
-	private settled?: NodeJS.Timeout;
 
 	constructor() {
 		super();
-		onFocus(() => this.safely(this.followed()));
+		onFocus(() => safely(this.followed(), this.kind));
 
-		// Same rules as the Branch Map. Only a real change to the token or
-		// the timer counts, or an echo of the same settings would set off a
-		// refresh that reads them, which echoes them again. And it waits a
-		// second, because the token box saves while I'm still pasting.
-		streamDeck.settings.onDidReceiveGlobalSettings<GlobalSettings>((ev) => {
-			const now = `${ev.settings.token ?? ""}|${ev.settings.refreshMinutes ?? ""}`;
-			if (now === this.lastGlobal) return;
-			const first = this.lastGlobal === "";
-			this.lastGlobal = now;
-			if (first) return;
-
-			clearTimeout(this.settled);
-			this.settled = setTimeout(() => {
-				forget();
-				this.known.clear();
-				this.safely(this.refreshAll());
-			}, 1000);
-		});
+		// A new token can belong to someone else, so what the keys knew is
+		// dropped before the clock refreshes them with it.
+		onSettingsChange(() => this.known.clear());
 	}
 
-	// Runs something in the background and writes any error to the log.
-	// Without this, one unexpected error from a timer would stop the whole
-	// plugin, since Node quits on an error nobody catches.
-	private safely(work: Promise<void>): void {
-		work.catch((error) => streamDeck.logger.error(`${this.manifestId}: ${error}`));
-	}
-
+	// The first key of a kind puts that kind's refresh on the shared clock,
+	// which runs it right away and then on every beat (see refresh.ts).
+	// Later keys just ask for their own repo.
 	override async onWillAppear(ev: WillAppearEvent<KeySettings>): Promise<void> {
 		if (!ev.action.isKey()) return;
+
+		// Whether this is the first key is decided before the first wait:
+		// two keys of one kind appear in the same moment when a page opens,
+		// and after a wait both would see two.
+		const first = this.settings.size === 0;
 		this.settings.set(ev.action.id, ev.payload.settings);
 		await this.show(ev.action);
 
-		if (!this.timer) this.timer = setTimeout(() => this.safely(this.refreshAll()), this.stagger);
+		if (first) register(this.kind, () => this.refreshAll());
 		else await this.refresh(ev.action.id);
 	}
 
 	// When the last key of this kind goes away (a page switch does this),
-	// the timer stops, and everything it knew is forgotten. The next key to
-	// show up starts both again.
+	// its refresh comes off the clock, and everything it knew is forgotten.
+	// The next key to show up starts both again.
 	override onWillDisappear(ev: WillDisappearEvent<KeySettings>): void {
 		this.settings.delete(ev.action.id);
 		this.sent.delete(ev.action.id);
 		if (this.settings.size > 0) return;
-		clearTimeout(this.timer);
-		this.timer = undefined;
+		unregister(this.kind);
 		this.known.clear();
+	}
+
+	// The name this kind of key goes on the clock under: its UUID from the
+	// manifest. The decorator fills it in before any key can appear, so it
+	// can't be missing here.
+	private get kind(): string {
+		return this.manifestId!;
 	}
 
 	override async onDidReceiveSettings(ev: DidReceiveSettingsEvent<KeySettings>): Promise<void> {
@@ -173,16 +154,10 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 		return repo && `${repo}|${this.variant(this.settingsOf(id))}`;
 	}
 
-	// Refreshes every repo a key of this kind is showing, then sets the
-	// timer for the next round.
+	// Refreshes every repo a key of this kind is showing. This is the job on
+	// the clock. One refresh per different answer, not per key: two keys
+	// showing the same thing share it.
 	private async refreshAll(): Promise<void> {
-		const settings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
-		const minutes = Number(settings.refreshMinutes) || DEFAULT_MINUTES;
-		clearTimeout(this.timer);
-		this.timer = setTimeout(() => this.safely(this.refreshAll()), minutes * 60 * 1000);
-
-		// One refresh per different answer, not per key: two keys showing
-		// the same thing share it.
 		const ids = new Map([...this.settings.keys()].map((id) => [this.keyOf(id), id]));
 		await this.showAll();
 		for (const id of ids.values()) await this.refresh(id, true);
@@ -190,7 +165,7 @@ export abstract class GitHubKey<T> extends SingletonAction<KeySettings> {
 
 	// Asks GitHub what one key needs, unless the same thing was asked in the
 	// last minute (several keys showing the same thing, or switching back
-	// and forth on the Repo key). force is for the timer.
+	// and forth on the Repo key). force is for the clock's beat.
 	private async refresh(id: string, force = false): Promise<void> {
 		const repo = this.repoOf(id);
 		const name = this.keyOf(id);

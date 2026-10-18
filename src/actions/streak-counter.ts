@@ -9,7 +9,7 @@ import {
 } from "@elgato/streamdeck";
 
 import { animate, idle, stopAnimating, stopIdling } from "../animate.ts";
-import { onChange, refreshNow, start, store, wantHistory } from "../data.ts";
+import { onChange, refreshNow, start, stop, store, wantHistory } from "../data.ts";
 import { SWAY_MS, TIERS } from "../flames.ts";
 import { drawStreakKey } from "../keys.ts";
 import { type Mode, streaks } from "../streak.ts";
@@ -92,6 +92,8 @@ export class StreakCounter extends SingletonAction<Settings> {
 		this.flared.delete(ev.action.id);
 		stopAnimating(ev.action.id);
 		stopIdling(ev.action.id);
+		// Only a key ever called start(), so only a key calls stop().
+		if (ev.payload.controller === "Keypad") stop();
 	}
 
 	// A press always refreshes. If there's a fire it flares up first, and

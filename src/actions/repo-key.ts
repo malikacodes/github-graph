@@ -7,11 +7,11 @@ import streamDeck, {
 	type WillAppearEvent,
 } from "@elgato/streamdeck";
 
-import type { GlobalSettings } from "../data.ts";
-import { focus, forget, isPrivate, onFocus, repoList, setFocus } from "../focus.ts";
+import { focus, isPrivate, onFocus, repoList, setFocus } from "../focus.ts";
 import { COLORS, drawGithubKey } from "../key-art.ts";
 import { repoLesson } from "../learn.ts";
 import { stepRepo } from "../picking.ts";
+import { onSettingsChange, safely } from "../refresh.ts";
 import { type KeySettings, sendRepos } from "./github-key.ts";
 
 // The Repo key: it shows the repo every GitHub key follows, and a press
@@ -27,29 +27,15 @@ export class RepoKey extends SingletonAction<KeySettings> {
 	// missing token says so instead of "loading" forever.
 	private problem?: string;
 
-	private lastToken?: string;
-	private settled?: NodeJS.Timeout;
-
 	constructor() {
 		super();
-		onFocus(() => void this.saveAndShow());
+		onFocus(() => safely(this.saveAndShow(), "repo key"));
 
 		// A new token can see repos the old one couldn't (or any at all, the
-		// first time), so the list is asked for again. Same one second wait
-		// as everywhere else, since the token box saves while I paste.
-		streamDeck.settings.onDidReceiveGlobalSettings<GlobalSettings>((ev) => {
-			const now = ev.settings.token ?? "";
-			const first = this.lastToken === undefined;
-			if (now === this.lastToken) return;
-			this.lastToken = now;
-			if (first) return;
-
-			clearTimeout(this.settled);
-			this.settled = setTimeout(() => {
-				forget();
-				void this.load();
-			}, 1000);
-		});
+		// first time), so the list is asked for again. The clock has already
+		// waited for the token box to settle and made focus.ts forget the
+		// old list by the time this runs.
+		onSettingsChange(() => safely(this.load(), "repo key"));
 	}
 
 	override async onWillAppear(ev: WillAppearEvent<KeySettings>): Promise<void> {
