@@ -13,7 +13,7 @@ import streamDeck, {
 
 import { laneLink, lanesFrom, layout, type Local, parseRepo, pick, type Placed } from "../branches.ts";
 import { drawBranches } from "../draw.ts";
-import { focus, onFocus, owner, token as getToken } from "../focus.ts";
+import { focus, onFocus, resolveRepo, token as getToken } from "../focus.ts";
 import { readLocal } from "../git.ts";
 import { fetchNetwork, type Network } from "../github-repo.ts";
 import { whichRepo } from "../picking.ts";
@@ -181,28 +181,21 @@ export class BranchNetwork extends SingletonAction<Settings> {
 		const repo = this.repos.get(text);
 		if (!repo || repo.busy) return;
 
-		const parsed = parseRepo(text);
-		if (!parsed) {
-			repo.message = "Pick a repo in settings";
-			await this.showAll();
-			return;
-		}
-
 		repo.busy = true;
 		const token = await getToken();
 
-		// A name with no owner is one of mine, looked up the same way the
-		// GitHub keys do it.
-		const login = parsed.owner ? { ok: true as const, data: parsed.owner } : await owner();
-		if (!login.ok) return this.failed(text, repo, login.message, login.detail);
+		// Whose repo it is, worked out the same way the GitHub keys do it.
+		const resolved = await resolveRepo(text);
+		if (!resolved.ok) return this.failed(text, repo, resolved.message, resolved.detail);
+		const { owner, name } = resolved.data;
 
-		const result = await fetchNetwork(token, login.data, parsed.name);
+		const result = await fetchNetwork(token, owner, name);
 		if (!result.ok) return this.failed(text, repo, result.message, result.detail);
 
 		// A repo picked in the picker is one of mine, so it might be in
 		// ~/Projects too. One typed as "someone/their-repo" isn't, even if a
 		// folder happens to have the same name.
-		repo.local = parsed.owner ? undefined : await readLocal(parsed.name, result.data.main);
+		repo.local = parseRepo(text)?.owner ? undefined : await readLocal(name, result.data.main);
 
 		repo.busy = false;
 		repo.network = result.data;

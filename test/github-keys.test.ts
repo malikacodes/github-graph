@@ -2,6 +2,7 @@ import assert from "node:assert";
 import { test } from "node:test";
 
 import { safe } from "../src/draw.ts";
+import { resolveRepo } from "../src/focus.ts";
 import { ask, rest } from "../src/github.ts";
 import { fetchAlerts, fetchCommitWeeks, fetchRelease, pile } from "../src/github-repo.ts";
 import { drawGithubKey, weekBars } from "../src/key-art.ts";
@@ -21,6 +22,31 @@ test("whichRepo: no setting follows the Repo key, a pinned repo stays put", () =
 	assert.strictEqual(whichRepo("", "leak-flow"), "leak-flow");
 	assert.strictEqual(whichRepo(" karaoke-maker ", "leak-flow"), "karaoke-maker");
 	assert.strictEqual(whichRepo(undefined, ""), undefined);
+});
+
+// Who owns the token, as the tests pretend it: a stand-in for owner(),
+// so no key setting ever reaches GitHub from here.
+const me = async () => ({ ok: true as const, data: "malikacodes" });
+const nobody = async () => ({ ok: false as const, message: "No internet", short: "Offline" });
+
+// Protects the everyday case: a repo picked by name alone is one of mine,
+// so my username goes in front of it.
+test("resolveRepo: a name alone is one of my repos", async () => {
+	assert.deepStrictEqual(await resolveRepo("leak-flow", me), { ok: true, data: { owner: "malikacodes", name: "leak-flow" } });
+	assert.deepStrictEqual(await resolveRepo("  leak-flow ", me), { ok: true, data: { owner: "malikacodes", name: "leak-flow" } });
+});
+
+// Protects "someone/their-repo": the owner is right there, so nobody has
+// to be asked who I am.
+test("resolveRepo: owner/name is taken as written", async () => {
+	assert.deepStrictEqual(await resolveRepo("someone/their-repo", nobody), { ok: true, data: { owner: "someone", name: "their-repo" } });
+});
+
+// Protects the two ways it can fail: a setting that isn't a repo name at
+// all, and not being able to find out who I am.
+test("resolveRepo: a bad name and an unknown owner each say so", async () => {
+	assert.deepStrictEqual(await resolveRepo("not a repo!", me), { ok: false, message: "That isn't a repo name", short: "Bad name" });
+	assert.deepStrictEqual(await resolveRepo("leak-flow", nobody), { ok: false, message: "No internet", short: "Offline" });
 });
 
 // Protects the Repo key's press: it goes round the list, and a repo that

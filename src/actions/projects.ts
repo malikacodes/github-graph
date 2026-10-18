@@ -18,10 +18,9 @@ export class Projects extends GitHubKey<View> {
 	protected readonly look = { icon: "board", color: COLORS.lavender } as const;
 	protected override readonly follows = false;
 
-	// Every Projects key is about my boards, whatever repo is picked. The
-	// shared code still wants a repo-shaped name to save answers under.
-	protected override repoOf(): string {
-		return "projects";
+	// Every Projects key is about my boards, whatever repo is picked.
+	protected override subject(): string {
+		return "my boards";
 	}
 
 	protected override variant(settings: KeySettings): string {
