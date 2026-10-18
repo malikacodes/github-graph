@@ -1,6 +1,6 @@
 import { action } from "@elgato/streamdeck";
 
-import { fetchCommitWeeks } from "../github.ts";
+import { fetchCommitWeeks } from "../github-repo.ts";
 import { COLORS, type Face, weekBars } from "../key-art.ts";
 import { commitsLesson } from "../learn.ts";
 import { GitHubKey } from "./github-key.ts";

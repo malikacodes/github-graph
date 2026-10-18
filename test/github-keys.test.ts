@@ -2,7 +2,8 @@ import assert from "node:assert";
 import { test } from "node:test";
 
 import { safe } from "../src/draw.ts";
-import { fetchAlerts, fetchCommitWeeks, fetchRelease, pile } from "../src/github.ts";
+import { ask, rest } from "../src/github.ts";
+import { fetchAlerts, fetchCommitWeeks, fetchRelease, pile } from "../src/github-repo.ts";
 import { drawGithubKey, weekBars } from "../src/key-art.ts";
 import { alertsLesson, alertWords, compareLesson, issueLesson, pullLesson, releaseLesson, runLesson, statOf } from "../src/learn.ts";
 import { ago, pickBranches, stepRepo, whichRepo } from "../src/picking.ts";
@@ -184,6 +185,135 @@ async function withGitHub(status: number, body: unknown, run: () => Promise<void
 		globalThis.fetch = real;
 	}
 }
+
+// Pretends to be GitHub with whatever fetch the test hands over, for the
+// answers withGitHub can't make: a web page instead of JSON, or no answer
+// at all.
+async function withFetch(fake: (url?: string, init?: RequestInit) => Promise<Response>, run: () => Promise<void>): Promise<void> {
+	const real = globalThis.fetch;
+	globalThis.fetch = fake as typeof fetch;
+	try {
+		await run();
+	} finally {
+		globalThis.fetch = real;
+	}
+}
+
+// Protects the one GraphQL door every question goes through: a good
+// answer comes back as its data, and a missing token never reaches fetch.
+test("ask: a 200 with data is the data, and no token is its own message", async () => {
+	await withGitHub(200, { data: { viewer: { login: "me" } } }, async () => {
+		assert.deepStrictEqual(await ask("t", "{ viewer { login } }", {}), { ok: true, data: { viewer: { login: "me" } } });
+	});
+	let called = false;
+	await withFetch(
+		async () => {
+			called = true;
+			return new Response("{}", { status: 200 });
+		},
+		async () => {
+			assert.deepStrictEqual(await ask(undefined, "{ viewer { login } }", {}), { ok: false, message: "Add a token in settings", short: "No token" });
+			assert.strictEqual(called, false);
+		},
+	);
+});
+
+// Protects the GraphQL edge: GitHub can say 200 and still refuse, with
+// errors and no data. That's a permission problem, and GitHub's own
+// reason rides along for the log.
+test("ask: a 200 with errors and no data is a permission problem", async () => {
+	await withGitHub(200, { errors: [{ message: "needs read:project" }, { message: "and again" }] }, async () => {
+		const result = await ask("t", "{ viewer { login } }", {});
+		assert.deepStrictEqual(result, { ok: false, message: "Token can't read this", short: "No access", detail: "needs read:project; and again" });
+	});
+});
+
+// Protects the ways asking can fail: a dead token, any other GitHub error,
+// a wifi login page instead of JSON, and no answer at all.
+test("ask: a 401, a 500, a non-JSON reply and a dead connection each say what happened", async () => {
+	await withGitHub(401, { message: "Bad credentials" }, async () => {
+		assert.deepStrictEqual(await ask("t", "{ viewer { login } }", {}), { ok: false, message: "Token didn't work", short: "Bad token" });
+	});
+	await withGitHub(500, {}, async () => {
+		assert.deepStrictEqual(await ask("t", "{ viewer { login } }", {}), { ok: false, message: "GitHub error 500", short: "Error 500" });
+	});
+	await withFetch(
+		async () => new Response("<html>Sign in to the wifi</html>", { status: 200 }),
+		async () => {
+			assert.deepStrictEqual(await ask("t", "{ viewer { login } }", {}), { ok: false, message: "GitHub's answer didn't make sense", short: "Odd reply" });
+		},
+	);
+	await withFetch(
+		async () => {
+			throw new TypeError("fetch failed");
+		},
+		async () => {
+			assert.deepStrictEqual(await ask("t", "{ viewer { login } }", {}), { ok: false, message: "No internet", short: "Offline" });
+		},
+	);
+});
+
+// Protects the REST door the same way: a good answer is its body, and a
+// token is optional, since public repos answer without one.
+test("rest: a 200 is its body, and the token header is only sent when there's a token", async () => {
+	const headers: (string | undefined)[] = [];
+	await withFetch(
+		async (_url?: string, init?: RequestInit) => {
+			headers.push((init?.headers as Record<string, string>).Authorization);
+			return new Response(JSON.stringify({ total_count: 3 }), { status: 200 });
+		},
+		async () => {
+			assert.deepStrictEqual(await rest("t", "me/repo/actions/workflows"), { ok: true, data: { total_count: 3 } });
+			assert.deepStrictEqual(await rest(undefined, "me/repo/actions/workflows"), { ok: true, data: { total_count: 3 } });
+			assert.deepStrictEqual(headers, ["Bearer t", undefined]);
+		},
+	);
+});
+
+// Protects the REST edge: 204 is "nothing to send" and comes back as
+// null, not as a broken reply.
+test("rest: a 204 is null", async () => {
+	await withFetch(
+		async () => new Response(null, { status: 204 }),
+		async () => {
+			assert.deepStrictEqual(await rest("t", "me/repo/stats/commit_activity"), { ok: true, data: null });
+		},
+	);
+});
+
+// Protects the REST failures: a dead token, a repo that isn't there, any
+// other error with GitHub's reason attached, a non-JSON reply, and no
+// answer at all.
+test("rest: 401, 404, 403 with a reason, non-JSON and a dead connection", async () => {
+	await withGitHub(401, { message: "Bad credentials" }, async () => {
+		assert.deepStrictEqual(await rest("t", "me/repo"), { ok: false, message: "Token didn't work", short: "Bad token" });
+	});
+	await withGitHub(404, { message: "Not Found" }, async () => {
+		assert.deepStrictEqual(await rest("t", "me/nope"), { ok: false, message: "Repo not found", short: "No repo" });
+	});
+	await withGitHub(403, { message: "Dependabot alerts are disabled for this repository." }, async () => {
+		assert.deepStrictEqual(await rest("t", "me/repo/dependabot/alerts"), {
+			ok: false,
+			message: "GitHub error 403",
+			short: "Error 403",
+			detail: "Dependabot alerts are disabled for this repository.",
+		});
+	});
+	await withFetch(
+		async () => new Response("<html>Sign in to the wifi</html>", { status: 200 }),
+		async () => {
+			assert.deepStrictEqual(await rest("t", "me/repo"), { ok: false, message: "GitHub's answer didn't make sense", short: "Odd reply" });
+		},
+	);
+	await withFetch(
+		async () => {
+			throw new TypeError("fetch failed");
+		},
+		async () => {
+			assert.deepStrictEqual(await rest("t", "me/repo"), { ok: false, message: "No internet", short: "Offline" });
+		},
+	);
+});
 
 // Protects the difference between "safe" and "nobody's checking": GitHub
 // answers 403 with "disabled" when Dependabot is off, and that must not

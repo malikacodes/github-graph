@@ -17,3 +17,4 @@ and how I fixed it.
 | 09 | 2026-10-15 | [Off isn't the same as safe](09-releases-security-projects.md) |
 | 10 | 2026-10-15 | [Two decks, one repo](10-two-decks-one-repo.md) |
 | 11 | 2026-10-17 | [Three copies of three lines](11-three-copies-of-three-lines.md) |
+| 12 | 2026-10-17 | [One file per audience](12-one-file-per-audience.md) |

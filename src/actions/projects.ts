@@ -1,7 +1,8 @@
 import streamDeck, { action } from "@elgato/streamdeck";
 
 import { token } from "../focus.ts";
-import { type Board, fetchBoard, fetchBoards, type Result } from "../github.ts";
+import { type Result } from "../github.ts";
+import { type Board, fetchBoard, fetchBoards } from "../github-repo.ts";
 import { boardPiles, COLORS, type Face } from "../key-art.ts";
 import { boardLesson } from "../learn.ts";
 import { GitHubKey, type KeySettings } from "./github-key.ts";

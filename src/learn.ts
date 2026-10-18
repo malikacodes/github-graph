@@ -1,4 +1,4 @@
-import type { Alerts, Board, Comparison, Counts, Release, Run, Stats } from "./github.ts";
+import type { Alerts, Board, Comparison, Counts, Release, Run, Stats } from "./github-repo.ts";
 import { ago, count } from "./picking.ts";
 
 // What each GitHub key's settings page says, row by row, in the same shape

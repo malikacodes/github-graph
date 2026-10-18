@@ -1,6 +1,7 @@
 import { action } from "@elgato/streamdeck";
 
-import { fetchRelease, type Release, type Result } from "../github.ts";
+import { type Result } from "../github.ts";
+import { fetchRelease, type Release } from "../github-repo.ts";
 import { COLORS, type Face } from "../key-art.ts";
 import { releaseLesson } from "../learn.ts";
 import { ago } from "../picking.ts";

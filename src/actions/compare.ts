@@ -1,7 +1,8 @@
 import streamDeck, { action } from "@elgato/streamdeck";
 
 import { owner, token } from "../focus.ts";
-import { fetchBranches, fetchComparison, type Result } from "../github.ts";
+import { type Result } from "../github.ts";
+import { fetchBranches, fetchComparison } from "../github-repo.ts";
 import { COLORS, type Face } from "../key-art.ts";
 import { compareLesson, type CompareView } from "../learn.ts";
 import { parseRepo } from "../branches.ts";
