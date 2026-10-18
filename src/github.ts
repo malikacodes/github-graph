@@ -9,7 +9,8 @@ export type Day = {
 // Either we got what we asked for, or we got a message to show instead.
 // short is the same message squeezed down for the full-width view, where
 // the only free space is a 52px column.
-export type Result<T> = { ok: true; data: T } | { ok: false; message: string; short: string };
+// detail is GitHub's own reason, when it gave one, for the log only.
+export type Result<T> = { ok: true; data: T } | { ok: false; message: string; short: string; detail?: string };
 
 // GitHub already sorts each day into one of five buckets, the same ones it
 // uses to pick the greens on a profile page, so I don't have to work out the
@@ -77,12 +78,13 @@ async function ask<T>(token: string | undefined, query: string, variables: objec
 	// GraphQL can answer "200 OK" and still have refused the question, for
 	// example when the token is valid but isn't allowed to read the profile.
 	// In that case the data part is just missing.
-	const body = (await response.json()) as { data?: { viewer: T } };
+	const body = (await response.json()) as { data?: T; errors?: { message: string }[] };
 	if (!body.data) {
-		return { ok: false, message: "Token can't read this", short: "No access" };
+		const detail = body.errors?.map((error) => error.message).join("; ");
+		return { ok: false, message: "Token can't read this", short: "No access", detail };
 	}
 
-	return { ok: true, data: body.data.viewer };
+	return { ok: true, data: body.data };
 }
 
 export type Recent = {
@@ -98,10 +100,12 @@ export type Recent = {
 export async function fetchRecent(token: string | undefined): Promise<Result<Recent>> {
 	const year = new Date().getFullYear();
 	const result = await ask<{
-		login: string;
-		createdAt: string;
-		lastYear: Calendar;
-		thisYear: { contributionCalendar: { totalContributions: number } };
+		viewer: {
+			login: string;
+			createdAt: string;
+			lastYear: Calendar;
+			thisYear: { contributionCalendar: { totalContributions: number } };
+		};
 	}>(
 		token,
 		`query($from: DateTime!) {
@@ -116,14 +120,15 @@ export async function fetchRecent(token: string | undefined): Promise<Result<Rec
 	);
 	if (!result.ok) return result;
 
+	const viewer = result.data.viewer;
 	return {
 		ok: true,
 		data: {
-			days: flatten(result.data.lastYear),
-			total: result.data.thisYear.contributionCalendar.totalContributions,
+			days: flatten(viewer.lastYear),
+			total: viewer.thisYear.contributionCalendar.totalContributions,
 			year,
-			joined: new Date(result.data.createdAt).getFullYear(),
-			login: result.data.login,
+			joined: new Date(viewer.createdAt).getFullYear(),
+			login: viewer.login,
 		},
 	};
 }
@@ -131,7 +136,7 @@ export async function fetchRecent(token: string | undefined): Promise<Result<Rec
 // One whole calendar year, January 1 to December 31. Only asked for when
 // the full-width view is turned to a year that isn't loaded yet.
 export async function fetchYear(token: string | undefined, year: number): Promise<Result<Day[]>> {
-	const result = await ask<{ year: Calendar }>(
+	const result = await ask<{ viewer: { year: Calendar } }>(
 		token,
 		`query($from: DateTime!, $to: DateTime!) {
 			viewer { year: contributionsCollection(from: $from, to: $to) { ${DAYS} } }
@@ -140,5 +145,158 @@ export async function fetchYear(token: string | undefined, year: number): Promis
 	);
 	if (!result.ok) return result;
 
-	return { ok: true, data: flatten(result.data.year) };
+	return { ok: true, data: flatten(result.data.viewer.year) };
+}
+
+// --- Branches, for the branch dial ---
+
+// What one branch has that main doesn't. This is REST and not GraphQL on
+// purpose: GraphQL's compare wants a token with the full "repo" permission
+// before it'll say how far ahead a branch is, even on a public repo. REST
+// answers that for public repos with any token, or none.
+//
+// per_page=1 keeps the answer small. GitHub lists the commits oldest
+// first, so the one commit that comes back is where the branch split off.
+async function compare(
+	token: string | undefined,
+	owner: string,
+	name: string,
+	main: string,
+	branch: string,
+): Promise<Result<{ ahead: number; firstCommit?: string } | undefined>> {
+	const path = `${encodeURIComponent(owner)}/${encodeURIComponent(name)}/compare/${encodeURIComponent(main)}...${encodeURIComponent(branch)}`;
+
+	let response: Response;
+	try {
+		response = await fetch(`https://api.github.com/repos/${path}?per_page=1`, {
+			headers: {
+				...(token ? { Authorization: `Bearer ${token}` } : {}),
+				Accept: "application/vnd.github+json",
+				"User-Agent": "github-graph-stream-deck",
+			},
+		});
+	} catch {
+		return { ok: false, message: "No internet", short: "Offline" };
+	}
+
+	if (response.status === 401) return { ok: false, message: "Token didn't work", short: "Bad token" };
+
+	// A branch deleted between the two requests, or one GitHub can't
+	// compare, just gets left off the map. It's not worth losing the
+	// whole map over one branch.
+	if (response.status === 404 || response.status === 422) return { ok: true, data: undefined };
+	if (!response.ok) {
+		return { ok: false, message: `GitHub error ${response.status}`, short: `Error ${response.status}` };
+	}
+
+	const body = (await response.json()) as { ahead_by: number; commits: { commit: { author: { date: string } | null } }[] };
+	return { ok: true, data: { ahead: body.ahead_by, firstCommit: body.commits[0]?.commit.author?.date } };
+}
+
+// Everything the branch dial needs from one repo, still in GitHub's terms.
+// branches.ts does the sorting into lanes, so this file only asks.
+export type Network = {
+	url: string;
+	main: string; // the default branch's name
+	// Every other branch on GitHub. ahead is how many commits it has that
+	// main doesn't, and firstCommit is when the oldest of those was made.
+	branches: { name: string; oid: string; ahead: number; firstCommit?: string }[];
+	// The last 20 merged pull requests. oid is the commit the branch was
+	// on when it merged, and start is when its first commit was made.
+	merged: { number: number; branch: string; oid: string; start: string; mergedAt: string }[];
+};
+
+// Only the first 30 branches get compared against main. Every branch is
+// one more request, and a repo of mine with more than 30 would be a mess
+// on a 100px tall strip anyway.
+const MOST_BRANCHES = 30;
+
+// Who owns the token, for a repo setting that's just a name.
+export async function fetchLogin(token: string | undefined): Promise<Result<string>> {
+	const result = await ask<{ viewer: { login: string } }>(token, "{ viewer { login } }", {});
+	if (!result.ok) return result;
+	return { ok: true, data: result.data.viewer.login };
+}
+
+// The branch names and merged pull requests come from GraphQL in one
+// question. Then each branch is compared against main, one REST request
+// each. Those have to wait for the names, so it can't be one trip.
+export async function fetchNetwork(token: string | undefined, owner: string, name: string): Promise<Result<Network>> {
+	type Repo = {
+		url: string;
+		defaultBranchRef: { name: string } | null;
+		refs: { nodes: { name: string; target: { oid: string } }[] };
+		pullRequests: {
+			nodes: {
+				number: number;
+				headRefName: string;
+				headRefOid: string;
+				mergedAt: string;
+				createdAt: string;
+				commits: { nodes: { commit: { authoredDate: string } }[] };
+			}[];
+		};
+	};
+
+	const first = await ask<{ repository: Repo | null }>(
+		token,
+		`query($owner: String!, $name: String!) {
+			repository(owner: $owner, name: $name) {
+				url
+				defaultBranchRef { name }
+				refs(refPrefix: "refs/heads/", first: 50) { nodes { name target { oid } } }
+				pullRequests(last: 20, states: MERGED) {
+					nodes { number headRefName headRefOid mergedAt createdAt commits(first: 1) { nodes { commit { authoredDate } } } }
+				}
+			}
+		}`,
+		{ owner, name },
+	);
+	if (!first.ok) return first;
+
+	// GitHub says the same "null" for a repo that doesn't exist and one the
+	// token isn't allowed to see, so the message has to cover both.
+	const repo = first.data.repository;
+	if (!repo) return { ok: false, message: "Repo not found", short: "No repo" };
+	if (!repo.defaultBranchRef) return { ok: false, message: "Repo is empty", short: "Empty" };
+
+	const main = repo.defaultBranchRef.name;
+	const others = repo.refs.nodes.filter((ref) => ref.name !== main).slice(0, MOST_BRANCHES);
+
+	// A pull request with no commits can't happen on GitHub, but createdAt
+	// is there as a fallback so a missing one can't break the whole dial.
+	const merged = repo.pullRequests.nodes.map((pr) => ({
+		number: pr.number,
+		branch: pr.headRefName,
+		oid: pr.headRefOid,
+		start: pr.commits.nodes[0]?.commit.authoredDate ?? pr.createdAt,
+		mergedAt: pr.mergedAt,
+	}));
+
+	if (others.length === 0) return { ok: true, data: { url: repo.url, main, branches: [], merged } };
+
+	const compared = await Promise.all(others.map((ref) => compare(token, owner, name, main, ref.name)));
+	const failed = compared.find((result) => !result.ok);
+	if (failed && !failed.ok) return failed;
+
+	const branches = others.map((ref, i) => {
+		const result = compared[i];
+		const info = result.ok ? result.data : undefined;
+		return { name: ref.name, oid: ref.target.oid, ahead: info?.ahead ?? 0, firstCommit: info?.firstCommit };
+	});
+
+	return { ok: true, data: { url: repo.url, main, branches, merged } };
+}
+
+// My repos, most recently pushed first, for the dropdown on the Branch Map
+// settings page. It only lists what the token can see, so with a token
+// that can't read private repos, those just aren't in the list.
+export async function fetchRepos(token: string | undefined): Promise<Result<string[]>> {
+	const result = await ask<{ viewer: { repositories: { nodes: { name: string }[] } } }>(
+		token,
+		`{ viewer { repositories(first: 100, ownerAffiliations: OWNER, orderBy: { field: PUSHED_AT, direction: DESC }) { nodes { name } } } }`,
+		{},
+	);
+	if (!result.ok) return result;
+	return { ok: true, data: result.data.viewer.repositories.nodes.map((repo) => repo.name) };
 }

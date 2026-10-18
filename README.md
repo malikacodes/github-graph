@@ -1,25 +1,26 @@
 # GitHub Graph
 
 A Stream Deck + plugin that puts my GitHub contributions on the dials and
-keys: the graph on the touch strip, and my total, my daily goal and my
-streak on keys. It's for anyone with a Stream Deck + who likes seeing their
+keys: the graph on the touch strip, a map of a repo's branches, and my
+total, my daily goal and my streak on keys. It's for anyone with a Stream Deck + who likes seeing their
 green squares without opening a browser tab. It's meant to feel cozy. It
 sits there, keeps itself up to date, throws confetti when I hit my goal,
 and only says something when it can't reach GitHub.
 
 ![The full-width graph across all four dials](screenshots/full-width-graph.png)
 
-## The five actions
+## The six actions
 
 | Action | What it does | Where it goes |
 |---|---|---|
 | 🟩 Contribution Graph | My last 14 weeks, or just this week | One dial |
 | 📅 Full-Width Graph | A whole year, edge to edge | All four dials |
+| 🚇 Branch Map | One repo's branches as a metro map | Two to four dials |
 | 🔢 Contribution Stats | My total for the year, and how fresh the number is | A key |
 | 🎯 Daily Goal | A ring that fills toward my target for today | A key |
 | 🔥 Streak Counter | A fire that grows the longer my streak goes | A key |
 
-All five share one download. GitHub gets asked once, no matter how many of
+The contribution ones share one download. GitHub gets asked once, no matter how many of
 them are on screen. Pressing any of them refreshes, and each one shows it
 for a second so I can tell the press did something.
 
@@ -60,6 +61,35 @@ picture, so together they read as one screen.
 The label on the right says where I am: `12 mo` for the rolling last year,
 or a year like `2025`. The other three dials ignore turns on purpose, so
 brushing one doesn't move the whole strip.
+
+### 🚇 Branch Map
+
+![leak-flow across two dials, then github-graph and pomodoro-streamdeck on one dial each](screenshots/branch-map.png)
+
+Main runs along the top, and every branch hangs off it as a curvy lane. A
+merged pull request leaves main where its first commit was made and loops
+back in where it merged. A branch that isn't merged yet, with a pull
+request or without one, leaves main and keeps going off the right side
+with a dot on the end. One lane at a time is picked: it's bright, the
+others fade back, and its whole name runs along the bottom with "still
+open" or when it merged.
+
+Pick the repo from the dropdown in the dial's settings. It lists my repos,
+most recently pushed first. Dials next to each other set to the same repo
+share one map, so one dial is a short map and four is a long one. It
+only takes the dials I put it on.
+
+| Do this | And this happens |
+|---|---|
+| ↪️ Turn any of its dials | Picks the next lane, left or right, and wraps around at the ends |
+| 🔘 Press the dial | Refreshes that repo |
+| 👆 Tap any of its dials | Opens the picked lane on GitHub: its pull request if it merged, the branch if it's still open |
+
+It starts on the newest open branch. It fits two lanes per dial in two
+rows, so it shows the branches still open first and then the newest merged
+ones. This dial has room for words,
+so anything wrong (`Repo not found`, `Add a token in settings`) shows
+right on the strip.
 
 ### 🔢 Contribution Stats
 
@@ -156,6 +186,14 @@ The plugin needs a GitHub token to ask for your contributions.
 3. Generate it, copy it, and paste it into the **GitHub Token** field in
    any action's settings in the Stream Deck app.
 
+The Branch Map reads repos, and `read:user` only covers public ones. A
+private repo is missing from the dropdown (or shows `Repo not found`, if it
+was picked before) until the token is allowed to read it.
+A classic token would need the `repo` box ticked, which also allows
+writing, so for private repos I'd make a fine-grained token instead, with
+read-only **Contents** and **Pull requests** on just the repos I want on
+the dial.
+
 Every action shares the same token and the same **Refresh Every** setting,
 which starts at 30 minutes. It also refreshes just after midnight, and a
 few seconds after the Mac wakes up.
@@ -183,8 +221,9 @@ something like `Up to date. Last checked 2:41 PM.`
 
 ## Why I built it this way
 
-- **One download for everything.** All five actions read from the same
-  place. Adding another key doesn't add another request.
+- **One download for everything.** All five contribution actions read
+  from the same place, and Branch Map dials on the same repo share one.
+  Adding another key doesn't add another request.
 - **The full-width graph stops 60 pixels short of the edge.** Filling all
   800 pixels with 53 weeks needs 15 pixels a week, and seven rows of that
   is 103 pixels tall on a 100 pixel strip. So the squares are 12 pixels,
@@ -217,6 +256,20 @@ something like `Up to date. Last checked 2:41 PM.`
 - **The token is a global setting.** A key's own settings are saved as
   plain text and go along for the ride when you export a profile. Global
   settings don't.
+- **The Branch Map is in order, not to scale.** My pull requests often
+  live for half an hour, and on a to-scale month that's less than a
+  pixel. Every "branch started" and "branch merged" gets the same step,
+  in the order they happened. Metro maps cheat the same way.
+- **Names show one at a time.** I tried names on the lanes, and on a
+  100 pixel strip they came out as `fir…` and `ti…`, which isn't a name.
+  Leaving lanes off to make room for whole names lost the overlapping
+  branches, which are the best part of the map. So the lanes have no
+  names, and the dial picks which one gets its name along the bottom.
+- **Squash merges needed a special case.** A squash merge copies a
+  branch's work onto main as one new commit, so GitHub still says the old
+  branch has commits main doesn't. A branch that's still on exactly the
+  commit its pull request merged from counts as merged. Without that,
+  every branch I never deleted showed up as open.
 - **Logging is turned down.** The SDK template logs every message between
   the plugin and Stream Deck, and one of those messages contains the
   settings. It's set to `info` so the token never lands in a log file.
@@ -224,8 +277,12 @@ something like `Up to date. Last checked 2:41 PM.`
 ## What it doesn't do
 
 - It only shows the account the token belongs to. There's no username field.
-- Tests cover the streak math only (`npm test`, 21 of them). The drawing
-  and everything else I checked by hand on the actual device.
+- The Branch Map only knows what's on GitHub. A branch that's only on my
+  Mac, or changes I haven't committed, don't show. It looks at the last 20
+  merged pull requests and the first 30 branches.
+- Tests cover the streak math and the Branch Map's sorting and layout
+  (`npm test`, 32 of them). The rest of the drawing I checked by hand on
+  the actual device.
 - A year with 54 week columns (2028 is the next one) gets slightly smaller
   squares on the full-width graph. I can't see that one for real until then.
 - Two keys animating at the same moment each get half the pictures, so
