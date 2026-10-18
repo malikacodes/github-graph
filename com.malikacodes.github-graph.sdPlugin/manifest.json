@@ -251,6 +251,60 @@
 					"ShowTitle": false
 				}
 			]
+		},
+		{
+			"Name": "Releases",
+			"UUID": "com.malikacodes.github-graph.releases",
+			"Icon": "imgs/actions/releases/icon",
+			"Tooltip": "The newest release of the repo. Press to open it on GitHub.",
+			"PropertyInspectorPath": "ui/releases.html",
+			"Controllers": [
+				"Keypad"
+			],
+			"UserTitleEnabled": false,
+			"SupportedInMultiActions": false,
+			"States": [
+				{
+					"Image": "imgs/actions/releases/key",
+					"ShowTitle": false
+				}
+			]
+		},
+		{
+			"Name": "Security",
+			"UUID": "com.malikacodes.github-graph.security",
+			"Icon": "imgs/actions/security/icon",
+			"Tooltip": "Dependabot alerts on the repo, or off when it isn't turned on. Press to open them on GitHub.",
+			"PropertyInspectorPath": "ui/github-key.html",
+			"Controllers": [
+				"Keypad"
+			],
+			"UserTitleEnabled": false,
+			"SupportedInMultiActions": false,
+			"States": [
+				{
+					"Image": "imgs/actions/security/key",
+					"ShowTitle": false
+				}
+			]
+		},
+		{
+			"Name": "Projects",
+			"UUID": "com.malikacodes.github-graph.projects",
+			"Icon": "imgs/actions/projects/icon",
+			"Tooltip": "One of my project boards: to do, doing and done. Press to open the board on GitHub.",
+			"PropertyInspectorPath": "ui/projects.html",
+			"Controllers": [
+				"Keypad"
+			],
+			"UserTitleEnabled": false,
+			"SupportedInMultiActions": false,
+			"States": [
+				{
+					"Image": "imgs/actions/projects/key",
+					"ShowTitle": false
+				}
+			]
 		}
 	],
 	"Category": "GitHub Graph",

@@ -402,7 +402,15 @@ async function rest<T>(token: string | undefined, path: string): Promise<Result<
 	}
 	if (response.status === 401) return { ok: false, message: "Token didn't work", short: "Bad token" };
 	if (response.status === 404) return { ok: false, message: "Repo not found", short: "No repo" };
-	if (!response.ok) return { ok: false, message: `GitHub error ${response.status}`, short: `Error ${response.status}` };
+	if (!response.ok) {
+		// GitHub's own reason, for the log and for keys that need to tell two
+		// errors with the same number apart.
+		const detail = await response
+			.json()
+			.then((body) => (body as { message?: string }).message)
+			.catch(() => undefined);
+		return { ok: false, message: `GitHub error ${response.status}`, short: `Error ${response.status}`, detail };
+	}
 	return { ok: true, data: (await response.json()) as T };
 }
 
@@ -537,4 +545,111 @@ export async function fetchComparison(
 	if (!result.ok && result.short === "No repo") return { ok: false, message: "That branch isn't there", short: "No branch" };
 	if (!result.ok) return result;
 	return { ok: true, data: { base, head, ahead: result.data.ahead_by, behind: result.data.behind_by, url: result.data.html_url } };
+}
+
+// The newest release. latest skips pre-releases and drafts, which is what
+// most people mean by "the latest version". With pre-releases on, it takes
+// the newest one that isn't a draft.
+export type Release = { tag: string; name: string; at: string; pre: boolean; url: string };
+
+export async function fetchRelease(token: string | undefined, owner: string, name: string, pre: boolean): Promise<Result<Release | undefined>> {
+	const repo = `${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
+	type Body = { tag_name: string; name: string | null; published_at: string; prerelease: boolean; draft: boolean; html_url: string };
+	const shape = (r: Body): Release => ({ tag: r.tag_name, name: r.name || r.tag_name, at: r.published_at, pre: r.prerelease, url: r.html_url });
+
+	if (!pre) {
+		const latest = await rest<Body>(token, `${repo}/releases/latest`);
+		// No releases at all is a 404 here, which isn't an error for this key.
+		if (!latest.ok && latest.short === "No repo") return { ok: true, data: undefined };
+		return latest.ok ? { ok: true, data: shape(latest.data) } : latest;
+	}
+
+	const list = await rest<Body[]>(token, `${repo}/releases?per_page=10`);
+	if (!list.ok) return list;
+	const newest = list.data.find((r) => !r.draft);
+	return { ok: true, data: newest && shape(newest) };
+}
+
+// Open Dependabot alerts, counted by how bad they are. off means Dependabot
+// isn't turned on for the repo, which GitHub answers with a 403 that says
+// so. That's different from "no alerts": nobody is checking.
+export type Alerts = { off: boolean; critical: number; high: number; medium: number; low: number };
+
+export async function fetchAlerts(token: string | undefined, owner: string, name: string): Promise<Result<Alerts>> {
+	const repo = `${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
+	const result = await rest<{ security_advisory: { severity: string } }[]>(token, `${repo}/dependabot/alerts?state=open&per_page=100`);
+	const none = { off: false, critical: 0, high: 0, medium: 0, low: 0 };
+
+	if (!result.ok && result.detail?.toLowerCase().includes("disabled")) return { ok: true, data: { ...none, off: true } };
+	if (!result.ok && result.short === "Error 403") return { ok: false, message: "Token can't read alerts", short: "No access" };
+	if (!result.ok) return result;
+
+	const counts = { ...none };
+	for (const alert of result.data) {
+		const severity = alert.security_advisory.severity as keyof typeof counts;
+		if (severity in counts && severity !== "off") counts[severity]++;
+		else counts.low++;
+	}
+	return { ok: true, data: counts };
+}
+
+// One of my GitHub project boards, with its items counted into three piles
+// by their Status column. Reading a project that belongs to me (not to a
+// repo or an organization) needs the classic read:project permission.
+export type Board = { title: string; url: string; todo: number; doing: number; done: number };
+export type BoardChoice = { number: number; title: string };
+
+type ProjectNode = {
+	number: number;
+	title: string;
+	url: string;
+	items: { nodes: { fieldValueByName: { name?: string } | null }[] };
+};
+
+export async function fetchBoards(token: string | undefined): Promise<Result<BoardChoice[]>> {
+	const result = await ask<{ viewer: { projectsV2: { nodes: { number: number; title: string; closed: boolean }[] } } }>(
+		token,
+		`{ viewer { projectsV2(first: 20, orderBy: { field: UPDATED_AT, direction: DESC }) { nodes { number title closed } } } }`,
+		{},
+	);
+	if (!result.ok) return noProjectScope(result);
+	return { ok: true, data: result.data.viewer.projectsV2.nodes.filter((p) => !p.closed).map(({ number, title }) => ({ number, title })) };
+}
+
+export async function fetchBoard(token: string | undefined, number: number | undefined): Promise<Result<Board | undefined>> {
+	const items = `items(first: 100) { nodes { fieldValueByName(name: "Status") { ... on ProjectV2ItemFieldSingleSelectValue { name } } } }`;
+	const result = await ask<{ viewer: { one?: ProjectNode | null; newest?: { nodes: ProjectNode[] } } }>(
+		token,
+		number
+			? `query($number: Int!) { viewer { one: projectV2(number: $number) { number title url ${items} } } }`
+			: `{ viewer { newest: projectsV2(first: 1, orderBy: { field: UPDATED_AT, direction: DESC }) { nodes { number title url ${items} } } } }`,
+		number ? { number } : {},
+	);
+	if (!result.ok) return noProjectScope(result);
+
+	const project = result.data.viewer.one ?? result.data.viewer.newest?.nodes[0];
+	if (!project) return { ok: true, data: undefined };
+	return { ok: true, data: { title: project.title, url: project.url, ...pile(project.items.nodes.map((n) => n.fieldValueByName?.name)) } };
+}
+
+// Sorts items into to do, doing and done by the name of their Status.
+// Boards name their columns differently, so it goes by words in the name,
+// and anything without a status counts as to do.
+export function pile(statuses: (string | undefined)[]): { todo: number; doing: number; done: number } {
+	const piles = { todo: 0, doing: 0, done: 0 };
+	for (const status of statuses) {
+		if (status && /done|complete|closed|shipped/i.test(status)) piles.done++;
+		else if (status && /progress|doing|review|active/i.test(status)) piles.doing++;
+		else piles.todo++;
+	}
+	return piles;
+}
+
+// The token answered, but GitHub refused the project part. That's almost
+// always the missing read:project permission, so the key says so.
+function noProjectScope<T>(result: { ok: false; message: string; short: string; detail?: string }): Result<T> {
+	if (result.detail?.includes("read:project") || result.message === "Token can't read this") {
+		return { ok: false, message: "The token needs read:project", short: "No access", detail: result.detail };
+	}
+	return result;
 }

@@ -25,6 +25,8 @@ export type KeySettings = {
 	stat?: string; // Repo Stats: which number to show
 	base?: string; // Branch Comparison: the branch to compare against
 	head?: string; // Branch Comparison: the branch being compared
+	pre?: boolean; // Releases: count pre-releases too
+	board?: string; // Projects: the board's number, blank for the newest
 };
 
 // What a key knows about one repo. data stays after a failed refresh, so
