@@ -1,4 +1,4 @@
-import type { Counts, Run } from "./github";
+import type { Comparison, Counts, Run, Stats } from "./github";
 import { ago, count } from "./picking.ts";
 
 // What each GitHub key's settings page says, row by row, in the same shape
@@ -141,4 +141,98 @@ export function outcome(conclusion: string | null | undefined): string {
 		default:
 			return "finished";
 	}
+}
+
+// Which number Repo Stats shows. Stars unless the settings say otherwise.
+export const STAT_NAMES = { stars: "Stars", forks: "Forks", watchers: "Watchers", language: "Language" } as const;
+export type Stat = keyof typeof STAT_NAMES;
+
+// hasOwn and not "in": every object has a built-in toString, so "in"
+// would let a setting like "toString" through.
+export function statOf(setting: string | undefined): Stat {
+	return setting && Object.hasOwn(STAT_NAMES, setting) ? (setting as Stat) : "stars";
+}
+
+export function statsLesson(repo: string | undefined, stats: Stats | undefined, message: string | undefined, stat: Stat): Lesson {
+	let right = waiting(repo, message);
+	if (!right && stats) {
+		right =
+			`${repo} has ${count(stats.stars, "star")}, ${count(stats.forks, "fork")} and ${count(stats.watchers, "watcher")}` +
+			(stats.language ? `. It's mostly ${stats.language.name}.` : ".");
+	}
+	return {
+		thisIs: `One number about the repo, picked under Show. This one shows ${STAT_NAMES[stat].toLowerCase()}.`,
+		now: right ?? "Checking...",
+		normal: [
+			"0 to 5 stars on a small personal repo",
+			"0 forks unless someone wants to build on it",
+			"1 watcher: me. GitHub watches my own repos for me",
+		],
+		words: [
+			["Star", "a bookmark someone leaves on a repo, and a small thumbs up"],
+			["Fork", "someone's own copy of the repo, which they can change without touching mine"],
+			["Watcher", "someone who gets told about everything that happens on the repo"],
+			["Language", "what most of the code is written in, worked out by GitHub from the files"],
+		],
+		tryThis: "Star one of my own repos on GitHub, then look back at the key after the next refresh.",
+		press: "Opens the page for the number on the key: stargazers, forks, watchers, or the repo itself for language.",
+	};
+}
+
+export function commitsLesson(repo: string | undefined, weeks: number[] | undefined, message: string | undefined): Lesson {
+	let right = waiting(repo, message);
+	if (!right && weeks) {
+		const recent = weeks.slice(-4).reduce((sum, n) => sum + n, 0);
+		const thisWeek = weeks[weeks.length - 1] ?? 0;
+		right = `${count(recent, "commit")} on ${repo}'s main branch in the last four weeks, ${thisWeek} of them this week.`;
+	}
+	return {
+		thisIs: "Commits on the repo's main branch, one bar per week for the last eight weeks. The number is the last four weeks.",
+		now: right ?? "Checking...",
+		normal: [
+			"0 to 15 a week on a small solo repo",
+			"Busy weeks spike and quiet weeks go flat. Both are normal",
+			"Squash merges count as one commit each, however many the branch had",
+		],
+		words: [
+			["Commit", "a saved snapshot of the code, with a message saying what changed"],
+			["Main branch", "the repo's default branch, where finished work ends up"],
+			["Push", "sending commits from my Mac up to GitHub"],
+		],
+		tryThis: "Merge a pull request, wait for the next refresh, and watch this week's bar grow.",
+		press: "Opens the repo's commit history on GitHub.",
+	};
+}
+
+// What Branch Comparison knows: the branches it chose, and how far apart
+// they are. comparison is missing when main is the only branch.
+export type CompareView = { main: string; names: string[]; comparison?: Comparison };
+
+export function compareLesson(repo: string | undefined, view: CompareView | undefined, message: string | undefined): Lesson {
+	let right = waiting(repo, message);
+	const c = view?.comparison;
+	if (!right && view && !c) right = `${repo} only has ${view.main}, so there's nothing to compare yet.`;
+	if (!right && c) {
+		if (c.ahead === 0 && c.behind === 0) right = `${c.head} and ${c.base} are the same right now.`;
+		else if (c.behind === 0) right = `${c.head} has ${count(c.ahead, "commit")} that ${c.base} doesn't.`;
+		else if (c.ahead === 0) right = `${c.head} is missing ${count(c.behind, "commit")} from ${c.base}.`;
+		else right = `${c.head} has ${count(c.ahead, "commit")} ${c.base} doesn't, and is missing ${c.behind} of ${c.base}'s.`;
+	}
+	return {
+		thisIs: "How far one branch has moved away from another. Blank settings compare the newest branch with main.",
+		now: right ?? "Checking...",
+		normal: [
+			"A branch I'm working on: a few ahead, 0 behind",
+			"Behind means main moved on since the branch started",
+			"After a squash merge a branch stays \"ahead\" forever. That's a sign it's safe to delete",
+		],
+		words: [
+			["Ahead", "commits the branch has that the base doesn't"],
+			["Behind", "commits the base has that the branch doesn't"],
+			["Diverged", "both at once: each has something the other doesn't"],
+			["Squash merge", "a branch's commits folded into one new commit on main"],
+		],
+		tryThis: "Make a branch, commit twice and push. With blank settings the key shows \"2 ahead\".",
+		press: "Opens GitHub's compare page for the two branches.",
+	};
 }

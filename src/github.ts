@@ -431,3 +431,110 @@ export async function fetchLatestRun(token: string | undefined, owner: string, n
 		},
 	};
 }
+
+// The numbers on a repo's front page, for Repo Stats.
+export type Stats = {
+	url: string;
+	stars: number;
+	forks: number;
+	watchers: number;
+	language?: { name: string; color: string | null };
+};
+
+export async function fetchStats(token: string | undefined, owner: string, name: string): Promise<Result<Stats>> {
+	const result = await ask<{
+		repository: {
+			url: string;
+			stargazerCount: number;
+			forkCount: number;
+			watchers: { totalCount: number };
+			primaryLanguage: { name: string; color: string | null } | null;
+		} | null;
+	}>(
+		token,
+		`query($owner: String!, $name: String!) {
+			repository(owner: $owner, name: $name) {
+				url stargazerCount forkCount watchers { totalCount } primaryLanguage { name color }
+			}
+		}`,
+		{ owner, name },
+	);
+	if (!result.ok) return result;
+	const repo = result.data.repository;
+	if (!repo) return { ok: false, message: "Repo not found", short: "No repo" };
+	return {
+		ok: true,
+		data: {
+			url: repo.url,
+			stars: repo.stargazerCount,
+			forks: repo.forkCount,
+			watchers: repo.watchers.totalCount,
+			language: repo.primaryLanguage ?? undefined,
+		},
+	};
+}
+
+// Commits on the default branch for each of the last eight weeks, oldest
+// first. GitHub works these out in the background: the first ask for a
+// repo can come back "202, still counting", so it gets a few short retries.
+export async function fetchCommitWeeks(
+	token: string | undefined,
+	owner: string,
+	name: string,
+	wait = (ms: number) => new Promise((done) => setTimeout(done, ms)),
+): Promise<Result<number[]>> {
+	const path = `${encodeURIComponent(owner)}/${encodeURIComponent(name)}/stats/commit_activity`;
+	for (let attempt = 0; attempt < 4; attempt++) {
+		const result = await rest<{ total: number }[] | Record<string, never>>(token, path);
+		if (!result.ok) return result;
+
+		// A 202 has an empty object for a body, not a list.
+		if (Array.isArray(result.data)) return { ok: true, data: result.data.slice(-8).map((week) => week.total) };
+		await wait(3000);
+	}
+	return { ok: false, message: "GitHub is still counting", short: "Counting..." };
+}
+
+// A repo's branches, newest commit first, and which one is the default.
+export type Branches = { main: string; names: string[] };
+
+export async function fetchBranches(token: string | undefined, owner: string, name: string): Promise<Result<Branches>> {
+	const result = await ask<{
+		repository: { defaultBranchRef: { name: string } | null; refs: { nodes: { name: string }[] } } | null;
+	}>(
+		token,
+		`query($owner: String!, $name: String!) {
+			repository(owner: $owner, name: $name) {
+				defaultBranchRef { name }
+				refs(refPrefix: "refs/heads/", first: 50, orderBy: { field: TAG_COMMIT_DATE, direction: DESC }) { nodes { name } }
+			}
+		}`,
+		{ owner, name },
+	);
+	if (!result.ok) return result;
+	const repo = result.data.repository;
+	if (!repo) return { ok: false, message: "Repo not found", short: "No repo" };
+	if (!repo.defaultBranchRef) return { ok: false, message: "Repo is empty", short: "Empty" };
+	return { ok: true, data: { main: repo.defaultBranchRef.name, names: repo.refs.nodes.map((ref) => ref.name) } };
+}
+
+// How far head has moved from base. ahead is commits head has that base
+// doesn't, behind is the other way round.
+export type Comparison = { base: string; head: string; ahead: number; behind: number; url: string };
+
+export async function fetchComparison(
+	token: string | undefined,
+	owner: string,
+	name: string,
+	base: string,
+	head: string,
+): Promise<Result<Comparison>> {
+	const repo = `${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
+	const result = await rest<{ ahead_by: number; behind_by: number; html_url: string }>(
+		token,
+		`${repo}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}?per_page=1`,
+	);
+	if (!result.ok && result.short === "No repo") return { ok: false, message: "That branch isn't there", short: "No branch" };
+	if (!result.ok) return result;
+	return { ok: true, data: { base, head, ahead: result.data.ahead_by, behind: result.data.behind_by, url: result.data.html_url } };
+}

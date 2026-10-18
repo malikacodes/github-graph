@@ -71,6 +71,8 @@ const ICONS = {
 		`<rect x="3.5" y="4" width="17" height="16" rx="2.5" fill="none" stroke="${c}" stroke-width="2"/><path d="M9.2 4v16M14.8 4v16" stroke="${c}" stroke-width="2"/>`,
 	branch: (c: string) =>
 		`<circle cx="6" cy="5.5" r="2.4" fill="none" stroke="${c}" stroke-width="2"/><circle cx="6" cy="18.5" r="2.4" fill="none" stroke="${c}" stroke-width="2"/><circle cx="18" cy="9" r="2.4" fill="none" stroke="${c}" stroke-width="2"/><path d="M6 8v8M18 11.4c0 4-6 3.4-11 5.4" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round"/>`,
+	// GitHub's own sign for a language: a plain dot in the language's color.
+	dot: (c: string) => `<circle cx="12" cy="12" r="7.5" fill="${c}"/>`,
 	plus: (c: string) =>
 		`<rect x="3" y="5" width="18" height="14" rx="3" fill="none" stroke="${c}" stroke-width="2"/><path d="M12 9v6M9 12h6" stroke="${c}" stroke-width="2" stroke-linecap="round"/>`,
 };
@@ -125,4 +127,19 @@ export function drawGithubKey(face: Face): string {
 	content += `<text x="72" y="130" font-size="${small.size}" fill="${face.alarm ? COLORS.red : COLORS.gray}" text-anchor="middle" ${FONT}>${safe(small.text)}</text>`;
 
 	return key(content);
+}
+
+// The middle of the Commit Activity key: a bar for each week, oldest on the
+// left, as tall as the space allows. An empty week still gets a faint stub,
+// so the eight weeks always read as eight. The total goes in the bottom
+// words, not here, so the bars get the room.
+export function weekBars(weeks: number[], color: string): string {
+	const most = Math.max(1, ...weeks);
+	const left = 72 - (weeks.length * 13 - 5) / 2;
+	let bars = "";
+	weeks.forEach((n, i) => {
+		const height = Math.max(4, Math.round((n / most) * 40));
+		bars += `<rect x="${left + i * 13}" y="${100 - height}" width="8" height="${height}" rx="2.5" fill="${color}" opacity="${n ? 1 : 0.35}"/>`;
+	});
+	return bars;
 }

@@ -39,3 +39,18 @@ export function ago(iso: string, now: number): string {
 export function count(n: number, word: string, plural = `${word}s`): string {
 	return `${n.toLocaleString("en-US")} ${n === 1 ? word : plural}`;
 }
+
+// Which two branches Branch Comparison compares. Empty settings mean "the
+// repo's main branch" for base and "the newest branch that isn't base" for
+// head, so the key works with no setup, even while following the Repo key
+// from one repo to the next. head is undefined when base is the only branch.
+export function pickBranches(
+	names: string[],
+	main: string,
+	base: string | undefined,
+	head: string | undefined,
+): { base: string; head?: string } {
+	const from = base?.trim() || main;
+	const to = head?.trim() || names.find((name) => name !== from);
+	return { base: from, head: to };
+}

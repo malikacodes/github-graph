@@ -197,6 +197,60 @@
 					"ShowTitle": false
 				}
 			]
+		},
+		{
+			"Name": "Repo Stats",
+			"UUID": "com.malikacodes.github-graph.stats-repo",
+			"Icon": "imgs/actions/stats-repo/icon",
+			"Tooltip": "Stars, forks, watchers or the main language of the repo. Press to open that page on GitHub.",
+			"PropertyInspectorPath": "ui/repo-stats.html",
+			"Controllers": [
+				"Keypad"
+			],
+			"UserTitleEnabled": false,
+			"SupportedInMultiActions": false,
+			"States": [
+				{
+					"Image": "imgs/actions/stats-repo/key",
+					"ShowTitle": false
+				}
+			]
+		},
+		{
+			"Name": "Commit Activity",
+			"UUID": "com.malikacodes.github-graph.commits",
+			"Icon": "imgs/actions/commits/icon",
+			"Tooltip": "Commits on the repo's main branch, week by week. Press to open the history on GitHub.",
+			"PropertyInspectorPath": "ui/github-key.html",
+			"Controllers": [
+				"Keypad"
+			],
+			"UserTitleEnabled": false,
+			"SupportedInMultiActions": false,
+			"States": [
+				{
+					"Image": "imgs/actions/commits/key",
+					"ShowTitle": false
+				}
+			]
+		},
+		{
+			"Name": "Branch Comparison",
+			"UUID": "com.malikacodes.github-graph.compare",
+			"Icon": "imgs/actions/compare/icon",
+			"Tooltip": "How far one branch has moved from another. Press to open the comparison on GitHub.",
+			"PropertyInspectorPath": "ui/compare.html",
+			"Controllers": [
+				"Keypad"
+			],
+			"UserTitleEnabled": false,
+			"SupportedInMultiActions": false,
+			"States": [
+				{
+					"Image": "imgs/actions/compare/key",
+					"ShowTitle": false
+				}
+			]
 		}
 	],
 	"Category": "GitHub Graph",

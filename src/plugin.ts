@@ -1,6 +1,8 @@
 import streamDeck from "@elgato/streamdeck";
 
 import { BranchNetwork } from "./actions/branch-network";
+import { Commits } from "./actions/commits";
+import { Compare } from "./actions/compare";
 import { ContributionGraph } from "./actions/contribution-graph";
 import { ContributionStats } from "./actions/contribution-stats";
 import { DailyGoal } from "./actions/daily-goal";
@@ -8,6 +10,7 @@ import { StreakCounter } from "./actions/streak-counter";
 import { Issues } from "./actions/issues";
 import { PullRequests } from "./actions/pull-requests";
 import { RepoKey } from "./actions/repo-key";
+import { RepoStats } from "./actions/repo-stats";
 import { WideGraph } from "./actions/wide-graph";
 import { Workflow } from "./actions/workflow";
 
@@ -26,6 +29,9 @@ streamDeck.actions.registerAction(new RepoKey());
 streamDeck.actions.registerAction(new PullRequests());
 streamDeck.actions.registerAction(new Issues());
 streamDeck.actions.registerAction(new Workflow());
+streamDeck.actions.registerAction(new RepoStats());
+streamDeck.actions.registerAction(new Commits());
+streamDeck.actions.registerAction(new Compare());
 
 // connect() has to come last, after the actions are registered.
 streamDeck.connect();
