@@ -13,6 +13,8 @@
 // profile called "Home" on each deck. Their ids are read from Stream Deck's
 // own files on this Mac, so nothing personal is typed in here, and the
 // built files stay out of git (see .gitignore). npm run profiles makes them.
+// Their picture (home.svg, next to this file) is Stream Deck's own white
+// house, copied onto pure black because the stock key isn't on black.
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -22,6 +24,7 @@ import { fileURLToPath } from "node:url";
 
 const PLUGIN = "com.malikacodes.github-graph";
 const SWITCH_PROFILE = "com.elgato.streamdeck.profile.rotate";
+const HOME_IMAGE = "home.png";
 
 // The model names Stream Deck uses for my two decks in a profile file.
 const MODELS = { xl: "20GAT9901", plus: "20GBD9901" };
@@ -100,7 +103,7 @@ function entry(manifest, name, id, homes, device) {
 			// An empty DeviceUUID means "the deck this key is on", so no deck's
 			// serial number ends up in the file.
 			Settings: { DeviceUUID: "", PageIndex: 1, ProfileUUID: homes[device] },
-			States: [{ FontFamily: "", FontSize: 16, FontStyle: "Bold", FontUnderline: false, OutlineThickness: 2, ShowTitle: true, Title: "Home", TitleAlignment: "middle", TitleColor: "#ffffff" }],
+			States: [{ FontFamily: "", FontSize: 12, FontStyle: "", FontUnderline: false, Image: `Images/${HOME_IMAGE}`, OutlineThickness: 2, ShowTitle: false, TitleAlignment: "bottom", TitleColor: "#ffffff" }],
 			UUID: SWITCH_PROFILE,
 		};
 	}
@@ -160,12 +163,23 @@ for (const key of Object.keys(PROFILES)) {
 		await mkdir(join(work, path, ".."), { recursive: true });
 		await writeFile(join(work, path), JSON.stringify(content));
 	}
+	// A key's picture lives in an Images folder beside the page it's on, and
+	// has to be a PNG. sips comes with macOS and does the converting. No Home
+	// key on this deck means no picture to add.
+	const images = [];
+	if (homes[PROFILES[key].device]) {
+		const page = Object.keys(files).find((path) => files[path].Controllers?.[0].Actions);
+		const image = join(page, "..", "Images", HOME_IMAGE);
+		await mkdir(join(work, image, ".."), { recursive: true });
+		execFileSync("sips", ["-s", "format", "png", fileURLToPath(new URL("home.svg", import.meta.url)), "--out", join(work, image)], { stdio: "ignore" });
+		images.push(image);
+	}
 	const file = join(out, `${key}.streamDeckProfile`);
 	await rm(file, { force: true });
 	// Just the files, profile manifest first, no folder entries, the way
 	// Stream Deck's own exports are laid out. -X leaves out extra file
 	// attributes.
-	execFileSync("zip", ["-q", "-X", "-D", file, ...Object.keys(files)], { cwd: work });
+	execFileSync("zip", ["-q", "-X", "-D", file, ...Object.keys(files), ...images], { cwd: work });
 	await rm(work, { recursive: true, force: true });
 	console.log(`${PROFILES[key].name}: ${homes[PROFILES[key].device] ? "with" : "without"} a Home key`);
 }
