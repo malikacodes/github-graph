@@ -73,6 +73,24 @@
 			]
 		},
 		{
+			"Name": "Heatmap",
+			"UUID": "com.malikacodes.github-graph.heatmap",
+			"Icon": "imgs/actions/heatmap/icon",
+			"Tooltip": "Your last 7 weeks of GitHub contributions. Press to open your profile.",
+			"PropertyInspectorPath": "ui/settings.html",
+			"Controllers": [
+				"Keypad"
+			],
+			"UserTitleEnabled": false,
+			"SupportedInMultiActions": false,
+			"States": [
+				{
+					"Image": "imgs/actions/heatmap/key",
+					"ShowTitle": false
+				}
+			]
+		},
+		{
 			"Name": "Contribution Stats",
 			"UUID": "com.malikacodes.github-graph.stats",
 			"Icon": "imgs/actions/stats/icon",

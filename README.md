@@ -16,6 +16,7 @@ and only says something when it can't reach GitHub.
 | 🟩 Contribution Graph | My last 14 weeks, or just this week | One dial |
 | 📅 Full-Width Graph | A whole year, edge to edge | All four dials |
 | 🚇 Branch Map | One repo's branches as a metro map | Two to four dials |
+| 🟫 Heatmap | My last 7 weeks as a grid on a rounded tile | A key |
 | 🔢 Contribution Stats | My total for the year, and how fresh the number is | A key |
 | 🎯 Daily Goal | A ring that fills toward my target for today | A key |
 | 🔥 Streak Counter | A fire that grows the longer my streak goes | A key |
@@ -109,6 +110,33 @@ just GitHub's, with no message about it. A repo typed as
 It only reads git, so it never fetches or changes anything in the repo.
 Local branches update when the map refreshes, so after making a branch I
 press the dial to see it right away.
+
+### 🟫 Heatmap
+
+My last 7 weeks on a key, same greens as the dial. Each row is a week,
+Sunday on the left, newest week on top, and the rest of this week is the
+dim "not yet" shade. The grid runs right off the key, the way an app
+icon fills its key: the outer squares get clipped by the rounded corners
+of the cap, so it looks like part of the key and not a sticker on it.
+Pressing it opens my GitHub profile. Like the graph dial it has no
+words: if it goes gray, the reason is on the **Status** line in its
+settings.
+
+I went through grids at 10px, 12px, 14px and 18px first. What reads
+fine in the Stream Deck app is tiny on the key itself, and a grid that
+stops short of the rim never looked like it belonged there. The squares
+are 18px with a 3px gap, which touches the edge of the key exactly, and
+those numbers are in thirds on purpose: the XL draws a key at 96px, two
+thirds of the 144 I draw at, so a 3px gap lands on exactly two pixels
+there instead of smearing into gray.
+
+The key cap is also a weak lens, and it pinches the outer ring of
+squares. So the grid is drawn bowed outward by just under 2 percent,
+only in the outer ring, from a point a little above the middle of the
+key because that's where the cap's center is from my chair, and the cap
+pinches it back to straight. The number took a photo of a measuring
+grid on the real key and a dozen looks to land. Bigger bows turned the
+key into a globe, and bowing it the other way made it worse.
 
 ### 🔢 Contribution Stats
 
