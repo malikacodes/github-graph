@@ -117,6 +117,97 @@ export function drawWeek(dates: string[], days: Map<string, Day>, gray: boolean)
 	return asImage(`<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100">${content}</svg>`);
 }
 
+// --- The heatmap key ---
+
+// The last 7 weeks on one key. The grid is GitHub's, turned: each row is
+// a week, Sunday on the left, and the newest week is on top, so today is
+// in the top row and the rest of this week is the dim "not yet" shade.
+//
+// The grid runs off the key on purpose. App icons fill their keys right
+// to the rim, and a grid that stopped short of it looked like a sticker
+// on the key instead of the key itself. Seven 21px steps less the last
+// gap is exactly 144, so the outer squares touch the edge of the key and
+// the cap's rounded corners clip them the same way they clip an icon.
+//
+// The sizes are in thirds for a reason. The XL draws each key at 96px,
+// two thirds of this 144 picture, so anything that's a multiple of 1.5
+// here lands on a whole pixel there: 18px squares with a 3px gap come out
+// as 12 and 2, pin sharp. The 20px squares with 1px gaps I had first
+// came out as 13.33 and 0.67, and the gaps smeared into gray fuzz.
+//
+// The key cap is a weak lens that pinches the outer ring of squares. So
+// every point is drawn moved by LENS times its distance from the lens
+// center to the fourth power, bowing the grid outward so the cap pinches
+// it back: the fourth power (not the usual square) keeps the middle of
+// the key flat, and only the outer ring moves. The scale by 1 + 2 LENS
+// pushes the middle of each side a pixel past the rim, so the corners,
+// which pull in, land mostly in the part of the key the cap hides.
+//
+// The numbers came from the real key, not the preview: a photo of a
+// measuring grid, then a dozen looks. 1.9% is about a panel pixel and a
+// half at the corners. Less moved nothing I could see, more turned the
+// key into a globe, and bowing it the other way made the pinch worse.
+// LENS at 0 draws it flat. Judged on my XL from where I sit, 2026-10-27.
+//
+export const HEATMAP_WEEKS = 7;
+export const LENS = -0.019;
+export const TOP_REACH = 1.5;
+// Where the bow is centered. A little above the middle of the key,
+// because I look down at the deck and that's where the cap's center
+// seems to be from my chair.
+export const LENS_CENTER_Y = 64;
+const SQUARE = 18;
+const STEP = 21;
+const GRID_EDGE = (144 - (HEATMAP_WEEKS * STEP - (STEP - SQUARE))) / 2;
+
+// Moves one point of the 144 picture to where it gets drawn. The bent
+// corners land on fractions of a panel pixel, and I tried snapping them
+// to whole ones for crisper edges: it made the outer ring uneven and
+// didn't change how the key felt, so they stay where the math puts them.
+export function lens(x: number, y: number): [number, number] {
+	const px = (x - 72) / 72;
+	const py = (y - LENS_CENTER_Y) / 72;
+	const r2 = px * px + py * py;
+	const f = (1 + LENS * r2 * r2) / (1 + 2 * LENS);
+	return [72 + px * f * 72, LENS_CENTER_Y + py * f * 72];
+}
+
+// columns is the run of weeks, oldest first, seven slots each (see
+// weekColumns in calendar.ts). A date we have no data for is drawn in the
+// "not yet" shade, since here that only happens to the rest of this week.
+export function drawHeatmap(columns: Columns, days: Map<string, Day>, gray: boolean): string {
+	const colors = gray ? GRAYS : COLORS;
+	const missing = gray ? GRAYS[0] : UPCOMING;
+
+	// Each square is its four corners put through the lens and joined up.
+	// Within one 18px square the bend is too small to see, so straight
+	// sides are fine; it's the corners moving that does the work.
+	let squares = "";
+	columns.forEach((week, w) => {
+		const row = columns.length - 1 - w;
+		week.forEach((date, slot) => {
+			if (!date) return;
+			const day = days.get(date);
+			const fill = day ? colors[day.level] : missing;
+			const left = GRID_EDGE + slot * STEP;
+			const top = GRID_EDGE + row * STEP;
+			// The top row reaches past the rim. I look down at the deck, so
+			// the top edge of every key is foreshortened and shows a sliver
+			// of black above the picture; the extra height fills it.
+			const above = row === 0 ? TOP_REACH : 0;
+			const corners = [
+				lens(left, top - above),
+				lens(left + SQUARE, top - above),
+				lens(left + SQUARE, top + SQUARE),
+				lens(left, top + SQUARE),
+			];
+			const points = corners.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+			squares += `<polygon points="${points}" fill="${fill}"/>`;
+		});
+	});
+	return blackKey(squares);
+}
+
 // --- The full-width graph ---
 
 // The whole strip is 800x100 across four dials. Seven rows have to fit in
